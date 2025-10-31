@@ -1,0 +1,138 @@
+/* Estilos globales */
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+#content {
+    height: 100%;
+    width: 100%;
+}
+
+/* Estilos para la página */
+.sapMPage {
+    background-color: #f5f5f5;
+}
+
+/* Estilos para la TreeTable */
+.sapUiSizeCompact .sapUiTable {
+    font-size: 0.875rem;
+}
+
+.sapUiTable {
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+}
+
+.sapUiTableRowHvr {
+    background-color: #f0f0f0 !important;
+}
+
+.sapUiTableRowSel {
+    background-color: #e3f2fd !important;
+}
+
+/* Estilos para los botones de acción */
+.sapMBtn {
+    margin-left: 0.5rem;
+}
+
+/* Estilos para el MessageStrip */
+.sapMMsgStrip {
+    margin-bottom: 1rem;
+}
+
+/* Estilos para las imágenes en la tabla */
+.sapUiTable img {
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* Estilos para el toolbar */
+.sapMTB {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 0.5rem 1rem;
+}
+
+/* Estilos para mejorar la visualización de la jerarquía */
+.sapUiTableTreeIcon {
+    color: #0854a0;
+}
+
+/* Estilos para los diálogos */
+.sapMDialog .sapMDialogSection {
+    padding: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+    .sapUiTable {
+        font-size: 0.75rem;
+    }
+    
+    .sapMBtn {
+        margin-left: 0.25rem;
+    }
+}
+
+/* Estilos para el estado busy */
+.sapUiLocalBusy {
+    opacity: 0.6;
+}
+
+/* Mejoras visuales para la tabla */
+.sapUiTableCell {
+    vertical-align: middle;
+}
+
+/* Estilos para texto truncado */
+.sapUiTableCell .sapMText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Estilos para filas padre */
+.sapUiTableTreeIconNodeOpen,
+.sapUiTableTreeIconNodeClosed {
+    font-weight: bold;
+}
+
+/* Animaciones suaves */
+.sapUiTable,
+.sapMBtn,
+.sapMMsgStrip {
+    transition: all 0.3s ease;
+}
+
+/* Estilos para el estado de hover en filas */
+.sapUiTableRowHvr .sapUiTableCell {
+    background-color: inherit;
+}
+
+/* Estilos para mejorar la legibilidad */
+.sapMLabel {
+    font-weight: 600;
+}
+
+.sapMTitle {
+    color: #0854a0;
+}
+
+.sapUiSmallMargin {
+    width: 100%;
+}
+
+.sapMPage, 
+.sapMPage > section,
+.sapMPage > section > .sapUiVlt,
+.sapMPage > section > .sapUiVBox {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
