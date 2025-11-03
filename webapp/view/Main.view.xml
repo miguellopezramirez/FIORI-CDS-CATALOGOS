@@ -1,0 +1,15 @@
+<mvc:View
+    controllerName="com.cat.sapfioricatalogs.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns:m="sap.m"
+>
+    <m:Page
+        id="Main"
+        title="{i18n>title}"
+    >
+        <m:Text
+            id="IdTextMain"
+            text="MI PAGINA DE INICIO (PRINCIPAL)"
+        />
+    </m:Page>
+</mvc:View>

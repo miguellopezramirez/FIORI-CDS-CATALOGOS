@@ -1,0 +1,10 @@
+{
+    "selectedKey": "RouteMain",
+    "navigation": [
+        {
+            "key": "RouteMain",
+            "title": "Catálogos",
+            "icon": "sap-icon://home"
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+<mvc:View
+    controllerName="com.cat.sapfioricatalogs.controller.App"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:tnt="sap.tnt"
+    xmlns:f="sap.f"
+    displayBlock="true"
+    height="100%">
+
+    <tnt:ToolPage id="toolPage">
+        
+        <tnt:header>
+            <f:ShellBar
+                id="shellBar"
+                title="Catálogos App"
+                homeIcon="./resources/images/logo_sap.png"
+                showMenuButton="true"
+                menuButtonPressed=".onMenuButtonPress">
+                <f:profile>
+                    <Avatar initials="UI" />
+                </f:profile>
+            </f:ShellBar>
+        </tnt:header>
+
+        <tnt:sideContent>
+            <tnt:SideNavigation
+                id="sideNavigation"
+                selectedKey="{sideMenuModel>/selectedKey}"
+                itemSelect=".onItemSelect">
+                <tnt:NavigationList items="{path: 'sideMenuModel>/navigation'}">
+                    <tnt:NavigationListItem
+                        text="{sideMenuModel>title}"
+                        icon="{sideMenuModel>icon}"
+                        key="{sideMenuModel>key}"
+                    />
+                </tnt:NavigationList>
+            </tnt:SideNavigation>
+        </tnt:sideContent>
+
+        <tnt:mainContents>
+            <App id="app" />
+        </tnt:mainContents>
+    </tnt:ToolPage>
+
+</mvc:View>
