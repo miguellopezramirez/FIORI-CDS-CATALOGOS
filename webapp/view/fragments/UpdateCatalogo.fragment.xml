@@ -1,0 +1,74 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+    
+    <Dialog
+        title="Modificar Registro"
+        contentWidth="500px"
+        resizable="true"
+        draggable="true">
+        
+        <content>
+            <form:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="4"
+                labelSpanL="4"
+                labelSpanM="4"
+                labelSpanS="12">
+                
+                <form:content>
+                    <Label text="ID Sociedad" required="true"/>
+                    <Input id="updateInputIdSociedad" placeholder="Ej: 1000"/>
+                    
+                    <Label text="ID CEDI" required="true"/>
+                    <Input id="updateInputIdCedi" placeholder="Ej: 1"/>
+                    
+                    <Label text="ID Etiqueta" required="true"/>
+                    <Input id="updateInputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO"/>
+                    
+                    <Label text="Etiqueta" required="true"/>
+                    <Input id="updateInputEtiqueta" placeholder="Ej: Tipo de Producto"/>
+
+                    <Label text="Valor" />
+                    <Input id="updateInputValor" placeholder="Ej: Color Rojo"/>
+
+                    <Label text="ID Valor" />
+                    <Input id="updateInputIdValor" placeholder="Ej: ROJO"/>
+                    
+                    <Label text="Secuencia"/>
+                    <Input id="updateInputSecuencia" type="Number" placeholder="0"/>
+                    
+                    <Label text="Imagen"/>
+                    <Input id="updateInputImagen" placeholder="URL de la imagen"/>
+                    
+                    <Label text="Ruta"/>
+                    <Input id="updateInputRuta" placeholder="Ruta"/>
+                    
+                    <Label text="Descripción"/>
+                    <TextArea
+                        id="updateTextAreaDescripcion"
+                        rows="3"
+                        placeholder="Descripción"/>
+                    
+                </form:content>
+            </form:SimpleForm>
+        </content>
+        
+        <beginButton>
+            <Button
+                text="Guardar"
+                type="Emphasized"
+                press=".onSaveUpdate"/>
+        </beginButton>
+        
+        <endButton>
+            <Button
+                text="Cancelar"
+                press=".onCloseUpdate"/>
+        </endButton>
+        
+    </Dialog>
+    
+</core:FragmentDefinition>

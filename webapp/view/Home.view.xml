@@ -1,0 +1,9 @@
+<mvc:View
+    controllerName="com.cat.sapfioricatalogs.controller.Home"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page id="page" title="Home Page - eCommerce Project">
+        <content>
+            </content>
+    </Page>
+</mvc:View>

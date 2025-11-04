@@ -2,9 +2,44 @@
     "selectedKey": "RouteMain",
     "navigation": [
         {
-            "key": "RouteMain",
-            "title": "Catálogos",
-            "icon": "sap-icon://home"
+            "title": "Home",
+            "icon": "sap-icon://home",
+            "key": "RouteMain"
+        },
+        {
+            "title": "Productos",
+            "icon": "sap-icon://product",
+            "key": "RouteProductos"
+        },
+        {
+            "title": "Precios",
+            "icon": "sap-icon://product",
+            "key": "RoutePrecios"
+        },
+        {
+            "title": "Catalogos",
+            "icon": "sap-icon://payment-approval",
+            "key": "RouteCatalogos"
+        },
+        {
+            "title": "Ordenes",
+            "icon": "sap-icon://order-status",
+            "key": "RouteOrdenes"
+        },
+        {
+            "title": "Pagos",
+            "icon": "sap-icon://payment-approval",
+            "key": "RoutePagos"
+        },
+        {
+            "title": "Envios",
+            "icon": "sap-icon://shipping-status",
+            "key": "RouteEnvios"
+        },
+        {
+            "title": "Inventarios",
+            "icon": "sap-icon://inventory",
+            "key": "RouteInventarios"
         }
     ]
 }

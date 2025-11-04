@@ -15,7 +15,8 @@ sap.ui.define([
                 selectedLabel: null,
                 saveMessage: "",
                 totalRows: 0,
-                busy: false
+                busy: false,
+                selectionCount: 0
             });
             this.getView().setModel(viewModel, "view");
 
@@ -61,14 +62,33 @@ sap.ui.define([
 
         onRowSelectionChange: function (oEvent) {
             const oTable = this.byId("treeTable");
-            const iSelectedIndex = oTable.getSelectedIndex();
             const viewModel = this.getView().getModel("view");
 
-            if (iSelectedIndex !== -1) {
+            // 1. Obtenemos el binding
+            const oBinding = oTable.getBinding("rows");
+            let aSelectedIndices = [];
+            if (oBinding) {
+                // 2. Obtenemos la lista de TODOS los índices seleccionados
+                aSelectedIndices = oBinding.getSelectedIndices();
+            }
+            
+            // 3. Actualizamos el CONTEO para el botón "Eliminar"
+            viewModel.setProperty("/selectionCount", aSelectedIndices.length);
+
+            // 4. Verificamos el conteo para los botones "Modificar" y "Nuevo Valor"
+            if (aSelectedIndices.length === 1) {
+                // 5. Si hay EXACTAMENTE UNO seleccionado:
+                // Obtenemos el índice (el primero y único) del arreglo
+                const iSelectedIndex = aSelectedIndices[0]; 
+                
+                // Usamos ese índice para obtener el objeto
                 const oContext = oTable.getContextByIndex(iSelectedIndex);
                 const selectedRow = oContext.getObject();
+                
+                // Establecemos el selectedLabel
                 viewModel.setProperty("/selectedLabel", selectedRow);
             } else {
+                // 6. Si hay 0 o más de 1 seleccionados, limpiamos el label.
                 viewModel.setProperty("/selectedLabel", null);
             }
         },
@@ -133,21 +153,82 @@ sap.ui.define([
         },
 
         onDelete: function () {
-            const viewModel = this.getView().getModel("view");
-            const selectedLabel = viewModel.getProperty("/selectedLabel");
+            const oTable = this.byId("treeTable");
+            const oBinding = oTable.getBinding("rows");
+            let aSelectedIndices = [];
+            if (oBinding) {
+                aSelectedIndices = oBinding.getSelectedIndices();
+            }
 
-            if (!selectedLabel) {
-                MessageBox.warning("Por favor, seleccione un registro para eliminar.");
+            if (aSelectedIndices.length === 0) {
+                MessageBox.warning("Por favor, seleccione al menos un registro para eliminar.");
                 return;
             }
 
+            // 1. Obtenemos todos los OBJETOS de registro a eliminar PRIMERO
+            const aRecordsToDelete = aSelectedIndices.map(iIndex => {
+                return oTable.getContextByIndex(iIndex).getObject();
+            });
+
             MessageBox.confirm(
-                "¿Está seguro de que desea eliminar este registro?",
+                `¿Está seguro de que desea eliminar ${aRecordsToDelete.length} registro(s)?`,
                 {
                     title: "Confirmar eliminación",
                     onClose: (oAction) => {
                         if (oAction === MessageBox.Action.OK) {
-                            this._deleteRecord(selectedLabel);
+                            
+                            // 2. Iteramos sobre los objetos y los añadimos al servicio
+                            aRecordsToDelete.forEach(oRecord => {
+                                this._deleteRecord(oRecord); // Llama a la función que añade la operación al servicio
+                            });
+
+                            // 3. AHORA modificamos el modelo (una sola vez)
+                            const dataModel = this.getView().getModel();
+                            let labels = dataModel.getProperty("/labels");
+
+                            // Separamos padres e hijos para un borrado limpio
+                            const parentsToDelete = aRecordsToDelete.filter(r => r.parent);
+                            const childrenToDelete = aRecordsToDelete.filter(r => !r.parent);
+
+                            let updatedLabels;
+
+                            // 4. Filtramos los padres eliminados
+                            if (parentsToDelete.length > 0) {
+                                updatedLabels = labels.filter(label => {
+                                    // Devuelve true si la 'label' NO está en la lista de 'parentsToDelete'
+                                    return !parentsToDelete.some(p => p.idetiqueta === label.idetiqueta);
+                                });
+                            } else {
+                                updatedLabels = [...labels]; // Sin cambios, pero creamos copia
+                            }
+
+                            // 5. Filtramos los hijos eliminados
+                            if (childrenToDelete.length > 0) {
+                                updatedLabels = updatedLabels.map(label => {
+                                    // Si este 'label' no tiene hijos, no hacemos nada
+                                    if (!label.children) return label;
+
+                                    // Filtramos los hijos de este label
+                                    const newChildren = label.children.filter(child => {
+                                        // Devuelve true si el 'child' NO está en la lista de 'childrenToDelete'
+                                        return !childrenToDelete.some(c => c.idvalor === child.idvalor);
+                                    });
+
+                                    return {
+                                        ...label,
+                                        children: newChildren
+                                    };
+                                });
+                            }
+
+                            // 6. Asignamos el nuevo arreglo al modelo UNA SOLA VEZ
+                            dataModel.setProperty("/labels", updatedLabels);
+                            
+                            // 7. Limpiamos la UI
+                            MessageToast.show(`${aRecordsToDelete.length} registro(s) marcado(s) para eliminación`);
+                            oTable.clearSelection();
+                            this.getView().getModel("view").setProperty("/selectionCount", 0);
+                            this.getView().getModel("view").setProperty("/selectedLabel", null);
                         }
                     }
                 }
@@ -157,35 +238,16 @@ sap.ui.define([
         _deleteRecord: function (record) {
             const operation = {
                 action: "DELETE",
+                type: record.parent ? "LABEL" : "VALUE",
                 data: record
             };
 
+            console.log("Adding DELETE operation:", operation);
             this._labelService.addOperation(operation);
             
-            const dataModel = this.getView().getModel();
-            const labels = dataModel.getProperty("/labels");
-            
-            if (record.parent) {
-                const updatedLabels = labels.filter(label => 
-                    label.idetiqueta !== record.idetiqueta
-                );
-                dataModel.setProperty("/labels", updatedLabels);
-            } else {
-                const updatedLabels = labels.map(label => {
-                    if (label.idetiqueta === record.parentKey) {
-                        return {
-                            ...label,
-                            children: label.children.filter(child => 
-                                child.idvalor !== record.idvalor
-                            )
-                        };
-                    }
-                    return label;
-                });
-                dataModel.setProperty("/labels", updatedLabels);
-            }
-
-            MessageToast.show("Registro marcado para eliminación");
+            // ¡¡TODA LA LÓGICA de dataModel.getProperty, .filter, .map, y .setProperty
+            // HA SIDO ELIMINADA DE AQUÍ!!
+            // El MessageToast se moverá a la función 'onDelete'.
         },
 
         onSaveChanges: function () {

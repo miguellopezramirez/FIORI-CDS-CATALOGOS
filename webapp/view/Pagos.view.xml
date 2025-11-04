@@ -1,0 +1,9 @@
+<mvc:View
+    controllerName="com.cat.sapfioricatalogs.controller.Pagos"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page id="page" title="Pagos">
+        <content>
+            </content>
+    </Page>
+</mvc:View>

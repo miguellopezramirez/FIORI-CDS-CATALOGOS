@@ -4,11 +4,11 @@
     "id": "com.cat.sapfioricatalogs",
     "type": "application",
     "i18n": {
-        "bundleName": "com.cat.sapfioricatalogs.i18n.i18n",
-        "fallbackLocale": "es_MX",
-        "supportedLocales": [
-          "es_MX"
-        ]
+      "bundleName": "com.cat.sapfioricatalogs.i18n.i18n",
+      "fallbackLocale": "es_MX",
+      "supportedLocales": [
+        "es_MX"
+      ]
     },
     "applicationVersion": {
       "version": "0.0.1"
@@ -94,6 +94,43 @@
           "target": [
             "TargetMain"
           ]
+        },
+        {
+          "name": "RouteCatalogos",
+          "pattern": "catalogos",
+          "target": [
+            "TargetCatalogos"
+          ]
+        },
+        {
+          "name": "RouteProductos",
+          "pattern": "productos",
+          "target": "TargetProductos"
+        },
+        {
+          "name": "RoutePrecios",
+          "pattern": "precios",
+          "target": "TargetPrecios"
+        },
+        {
+          "name": "RouteOrdenes",
+          "pattern": "ordenes",
+          "target": "TargetOrdenes"
+        },
+        {
+          "name": "RoutePagos",
+          "pattern": "pagos",
+          "target": "TargetPagos"
+        },
+        {
+          "name": "RouteEnvios",
+          "pattern": "envios",
+          "target": "TargetEnvios"
+        },
+        {
+          "name": "RouteInventarios",
+          "pattern": "inventarios",
+          "target": "TargetInventarios"
         }
       ],
       "targets": {
@@ -101,8 +138,57 @@
           "viewType": "XML",
           "transition": "slide",
           "clearControlAggregation": false,
+          "viewId": "Home",
+          "viewName": "Home"
+        },
+        "TargetProductos": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Productos",
+          "viewName": "Productos"
+        },
+        "TargetPrecios": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Precios",
+          "viewName": "Precios"
+        },
+        "TargetCatalogos": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
           "viewId": "Catalogos",
           "viewName": "Catalogos"
+        },
+        "TargetOrdenes": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Ordenes",
+          "viewName": "Ordenes"
+        },
+        "TargetPagos": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Pagos",
+          "viewName": "Pagos"
+        },
+        "TargetEnvios": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Envios",
+          "viewName": "Envios"
+        },
+        "TargetInventarios": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Inventarios",
+          "viewName": "Inventarios"
         }
       }
     },
