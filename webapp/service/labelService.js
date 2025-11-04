@@ -47,11 +47,8 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       });
     },
 
-    /**
-     * Obtiene todas las etiquetas y valores desde el backend.
-     * Ahora los parámetros van en la query string (params)
-     * y el body va vacío, igual que en el servicio React.
-     */
+    
+    //Obtiene todas las etiquetas y valores desde el backend.
     fetchLabels: function () {
       const url =
         this._baseUrl +
@@ -62,7 +59,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
           url: url,
           type: "POST",
           contentType: "application/json",
-          data: JSON.stringify({}), // sin body de datos
+          data: JSON.stringify({}), 
           success: (result) => {
             try {
               const apiData = result.data?.[0]?.dataRes || [];
@@ -85,11 +82,8 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       this._operations.push(operation);
     },
 
-    /**
-     * Guarda las operaciones pendientes.
-     * Se mandan los parámetros en la query string
-     * y los datos (operations) en el body JSON.
-     */
+    
+    // Guarda las operaciones pendientes.
     saveChanges: function () {
       if (this._operations.length === 0) {
         return Promise.resolve({

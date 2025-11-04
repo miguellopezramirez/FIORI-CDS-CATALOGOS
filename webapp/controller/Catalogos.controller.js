@@ -64,21 +64,21 @@ sap.ui.define([
             const oTable = this.byId("treeTable");
             const viewModel = this.getView().getModel("view");
 
-            // 1. Obtenemos el binding
+            // Obtener el binding
             const oBinding = oTable.getBinding("rows");
             let aSelectedIndices = [];
             if (oBinding) {
-                // 2. Obtenemos la lista de TODOS los índices seleccionados
+                // Obtener la lista de todos los índices seleccionados
                 aSelectedIndices = oBinding.getSelectedIndices();
             }
             
-            // 3. Actualizamos el CONTEO para el botón "Eliminar"
+            // Actualizar el conteo para el botón eliminar
             viewModel.setProperty("/selectionCount", aSelectedIndices.length);
 
-            // 4. Verificamos el conteo para los botones "Modificar" y "Nuevo Valor"
+            // Verificar el conteo para los botones "Modificar" y "Nuevo Valor"
             if (aSelectedIndices.length === 1) {
-                // 5. Si hay EXACTAMENTE UNO seleccionado:
-                // Obtenemos el índice (el primero y único) del arreglo
+                // Si hay solo uno seleccionado
+                // Obtener el índice del arreglo
                 const iSelectedIndex = aSelectedIndices[0]; 
                 
                 // Usamos ese índice para obtener el objeto
@@ -88,7 +88,7 @@ sap.ui.define([
                 // Establecemos el selectedLabel
                 viewModel.setProperty("/selectedLabel", selectedRow);
             } else {
-                // 6. Si hay 0 o más de 1 seleccionados, limpiamos el label.
+                // Si hay 0 o más de 1 seleccionados, limpiar el label.
                 viewModel.setProperty("/selectedLabel", null);
             }
         },
@@ -165,7 +165,7 @@ sap.ui.define([
                 return;
             }
 
-            // 1. Obtenemos todos los OBJETOS de registro a eliminar PRIMERO
+            // Obtener todos los objetos de registro a eliminar primero
             const aRecordsToDelete = aSelectedIndices.map(iIndex => {
                 return oTable.getContextByIndex(iIndex).getObject();
             });
@@ -177,40 +177,37 @@ sap.ui.define([
                     onClose: (oAction) => {
                         if (oAction === MessageBox.Action.OK) {
                             
-                            // 2. Iteramos sobre los objetos y los añadimos al servicio
+                            // Iterar sobre los objetos y los añadimos al servicio
                             aRecordsToDelete.forEach(oRecord => {
-                                this._deleteRecord(oRecord); // Llama a la función que añade la operación al servicio
+                                this._deleteRecord(oRecord); 
                             });
 
-                            // 3. AHORA modificamos el modelo (una sola vez)
+                            // Modificar el modelo
                             const dataModel = this.getView().getModel();
                             let labels = dataModel.getProperty("/labels");
 
-                            // Separamos padres e hijos para un borrado limpio
+                            // Separar padres e hijos
                             const parentsToDelete = aRecordsToDelete.filter(r => r.parent);
                             const childrenToDelete = aRecordsToDelete.filter(r => !r.parent);
 
                             let updatedLabels;
 
-                            // 4. Filtramos los padres eliminados
+                            // Filtrar los padres eliminados
                             if (parentsToDelete.length > 0) {
                                 updatedLabels = labels.filter(label => {
-                                    // Devuelve true si la 'label' NO está en la lista de 'parentsToDelete'
                                     return !parentsToDelete.some(p => p.idetiqueta === label.idetiqueta);
                                 });
                             } else {
-                                updatedLabels = [...labels]; // Sin cambios, pero creamos copia
+                                updatedLabels = [...labels]; // crear copia
                             }
 
-                            // 5. Filtramos los hijos eliminados
+                            // 5. Filtrar los hijos eliminados
                             if (childrenToDelete.length > 0) {
                                 updatedLabels = updatedLabels.map(label => {
-                                    // Si este 'label' no tiene hijos, no hacemos nada
                                     if (!label.children) return label;
 
-                                    // Filtramos los hijos de este label
+                                    // Filtra los hijos de este label
                                     const newChildren = label.children.filter(child => {
-                                        // Devuelve true si el 'child' NO está en la lista de 'childrenToDelete'
                                         return !childrenToDelete.some(c => c.idvalor === child.idvalor);
                                     });
 
@@ -221,10 +218,10 @@ sap.ui.define([
                                 });
                             }
 
-                            // 6. Asignamos el nuevo arreglo al modelo UNA SOLA VEZ
+                            // Asignar el nuevo arreglo al modelo
                             dataModel.setProperty("/labels", updatedLabels);
                             
-                            // 7. Limpiamos la UI
+                            // Limpiar la UI
                             MessageToast.show(`${aRecordsToDelete.length} registro(s) marcado(s) para eliminación`);
                             oTable.clearSelection();
                             this.getView().getModel("view").setProperty("/selectionCount", 0);
@@ -245,9 +242,6 @@ sap.ui.define([
             console.log("Adding DELETE operation:", operation);
             this._labelService.addOperation(operation);
             
-            // ¡¡TODA LA LÓGICA de dataModel.getProperty, .filter, .map, y .setProperty
-            // HA SIDO ELIMINADA DE AQUÍ!!
-            // El MessageToast se moverá a la función 'onDelete'.
         },
 
         onSaveChanges: function () {
