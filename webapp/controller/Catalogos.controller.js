@@ -269,6 +269,16 @@ sap.ui.define([
         },
 
         onRefresh: function () {
+            const oSearchField = this.byId("searchField");
+            if (oSearchField) {
+                oSearchField.setValue("");
+            }
+
+            const oTable = this.byId("treeTable");
+            const oBinding = oTable.getBinding("rows");
+            if (oBinding) {
+                oBinding.filter([]); // 🔄 Limpia filtros
+            }
             this._loadLabels();
         },
 
@@ -353,6 +363,34 @@ sap.ui.define([
 
             this._updateDialog.close();
             MessageToast.show("Cambios guardados. No olvide confirmar los cambios.");
+        },
+
+        onSearch: function (oEvent) {
+            const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
+            const oTable = this.byId("treeTable");
+            const oBinding = oTable.getBinding("rows");
+
+            if (!oBinding) return;
+
+            // 🔍 Campos que queremos filtrar
+            const aFilters = [];
+            if (sQuery) {
+                const sLower = sQuery.toLowerCase();
+                aFilters.push(
+                    new sap.ui.model.Filter({
+                        filters: [
+                            new sap.ui.model.Filter("etiqueta", sap.ui.model.FilterOperator.Contains, sQuery),
+                            new sap.ui.model.Filter("descripcion", sap.ui.model.FilterOperator.Contains, sQuery),
+                            new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
+                            new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery)
+                        ],
+                        and: false // OR lógico entre los campos
+                    })
+                );
+            }
+
+            oBinding.filter(aFilters);
         }
+
     });
 });
