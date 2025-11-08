@@ -1,7 +1,8 @@
 sap.ui.define([
     "sap/ui/core/UIComponent",
-    "com/cat/sapfioricatalogs/model/models"
-], (UIComponent, models) => {
+    "com/cat/sapfioricatalogs/model/models",
+    "sap/ui/model/json/JSONModel"
+], (UIComponent, models, JSONModel) => {
     "use strict";
 
     return UIComponent.extend("com.cat.sapfioricatalogs.Component", {
@@ -18,6 +19,12 @@ sap.ui.define([
 
             // set the device model
             this.setModel(models.createDeviceModel(), "device");
+
+            // Modelo global para la configuración
+            var oConfigModel = new JSONModel({
+                selectedDB: "MongoDB" // Valor por defecto
+            });
+            this.setModel(oConfigModel, "config");
 
             // enable routing
             this.getRouter().initialize();

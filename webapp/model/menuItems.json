@@ -40,6 +40,11 @@
             "title": "Inventarios",
             "icon": "sap-icon://inventory",
             "key": "RouteInventarios"
+        },
+        {
+            "title": "Configuración",
+            "icon": "sap-icon://settings",
+            "key": "RouteConfiguracion"
         }
     ]
 }

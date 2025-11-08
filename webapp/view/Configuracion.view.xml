@@ -1,9 +1,21 @@
 <mvc:View
     controllerName="com.cat.sapfioricatalogs.controller.Configuracion"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
-    <Page id="page" title="Productos">
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Page id="configuracionPage" title="Configuración">
         <content>
-            </content>
+            <VBox class="sapUiSmallMargin">
+                <Label text="Seleccionar Base de Datos" design="Bold" class="sapUiSmallMarginBottom" />
+
+                <Select id="dbSelectionList" change=".onDbSelectionChange" width="250px">
+                    <items>
+                        <core:Item key="MongoDB" text="MongoDB" />
+                        
+                        <core:Item key="CosmosDB" text="Azure CosmosDB" />
+                    </items>
+                </Select>
+            </VBox>
+        </content>
     </Page>
 </mvc:View>

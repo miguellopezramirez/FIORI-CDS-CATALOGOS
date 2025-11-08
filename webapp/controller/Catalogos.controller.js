@@ -27,11 +27,24 @@ sap.ui.define([
             });
             this.getView().setModel(dataModel);
 
+            //Obtener el modelo 'config' global
+            var oConfigModel = this.getOwnerComponent().getModel("config");
+
             // Inicializar el servicio
             this._labelService = new LabelService();
+            this._labelService.setConfigModel(oConfigModel); // Inyectamos el modelo
 
             // Cargar los datos iniciales
             this._loadLabels();
+
+            // Suscribirse al evento de cambio de BD
+            var oEventBus = this.getOwnerComponent().getEventBus();
+            oEventBus.subscribe(
+                "configChannel",  // El canal que definimos en Configuracion
+                "dbChanged",      // El evento que definimos en Configuracion
+                this._loadLabels, // La función a ejecutar (this._loadLabels)
+                this              // El contexto (importante para que 'this' funcione)
+            );
         },
 
         _loadLabels: function () {

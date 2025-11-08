@@ -25,6 +25,21 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
   return BaseObject.extend("com.cat.sapfioricatalogs.service.labelService", {
     _baseUrl: "http://localhost:3034/api/cat/",
     _operations: [],
+    _oConfigModel: null, // Variable para guardar el modelo
+
+    // Esta función la llama el controlador
+    setConfigModel: function (oModel) {
+      this._oConfigModel = oModel;
+    },
+
+    // Helper para obtener el valor de la DB
+    _getDBServer: function () {
+      if (this._oConfigModel) {
+        return this._oConfigModel.getProperty("/selectedDB");
+      }
+      // Valor por defecto si algo falla
+      return "MongoDB"; 
+    },
 
     transformData: function (labels) {
       return labels.map(function (label) {
@@ -71,9 +86,11 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
 
     //Obtiene todas las etiquetas y valores desde el backend.
     fetchLabels: function () {
+      // Obtenemos el valor de la DB dinámicamente
+      const sDBServer = this._getDBServer();
       const url =
         this._baseUrl +
-        "crudLabelsValues?ProcessType=GetAll&LoggedUser=MIGUELLOPEZ&DBServer=MongoDB";
+        "crudLabelsValues?ProcessType=GetAll&LoggedUser=MIGUELLOPEZ&DBServer=" + sDBServer;
 
       return new Promise((resolve, reject) => {
         jQuery.ajax({
@@ -113,9 +130,11 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
         });
       }
 
+      // Obtenemos el valor de la DB dinámicamente
+      const sDBServer = this._getDBServer();
       const url =
         this._baseUrl +
-        "crudLabelsValues?ProcessType=CRUD&LoggedUser=MIGUELLOPEZ&DBServer=MongoDB";
+        "crudLabelsValues?ProcessType=CRUD&LoggedUser=MIGUELLOPEZ&DBServer=" + sDBServer;
 
       return new Promise((resolve, reject) => {
         jQuery.ajax({
