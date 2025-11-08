@@ -1,6 +1,27 @@
 sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
   "use strict";
 
+  /**
+ * Convierte un string de índices (separados por comas) en un array de Tokens.
+ * @param {string} sIndice El string de índices, ej: "Marca,Vehiculo"
+ * @returns {Array<object>} Un array de objetos para el MultiInput, ej: [{key: "Marca", text: "Marca"}, ...]
+ */
+  function _transformIndiceToArray(sIndice) {
+    if (!sIndice || sIndice.trim() === "") {
+      return []; // Devuelve array vacío si no hay índice
+    }
+
+    // Asumimos que tus etiquetas en el string están separadas por comas
+    const aTags = sIndice.split(',');
+
+    return aTags.map(function (sTag) {
+      const sTrimmedTag = sTag.trim();
+      if (sTrimmedTag) {
+        return { key: sTrimmedTag, text: sTrimmedTag };
+      }
+    }).filter(Boolean); // Filtra posibles valores vacíos (ej. si había "tag1,,tag2")
+  }
+
   return BaseObject.extend("com.cat.sapfioricatalogs.service.labelService", {
     _baseUrl: "http://localhost:3034/api/cat/",
     _operations: [],
@@ -9,8 +30,8 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       return labels.map(function (label) {
         const subRows = (label.valores || []).map(function (valor) {
           return {
-            idsociedad: valor.IDSOCIEDAD.toString(),
-            idcedi: valor.IDCEDI.toString(),
+            idsociedad: valor.IDSOCIEDAD || "",
+            idcedi: valor.IDCEDI || "",
             idetiqueta: valor.IDETIQUETA,
             idvalor: valor.IDVALOR,
             idvalorpa: valor.IDVALORPA,
@@ -20,7 +41,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
             imagen: valor.IMAGEN,
             ruta: valor.ROUTE,
             descripcion: valor.DESCRIPCION,
-            indice: label.INDICE || "",
+            indice: _transformIndiceToArray(label.INDICE) || "", // Los hijos heredan/usan el índice del padre
             coleccion: label.COLECCION || "",
             seccion: label.SECCION || "",
             parent: false,
@@ -30,11 +51,11 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
 
         return {
           parent: true,
-          idsociedad: label.IDSOCIEDAD.toString(),
-          idcedi: label.IDCEDI.toString(),
+          idsociedad: label.IDSOCIEDAD || "",
+          idcedi: label.IDCEDI || "",
           idetiqueta: label.IDETIQUETA,
           etiqueta: label.ETIQUETA,
-          indice: label.INDICE || "",
+          indice: _transformIndiceToArray(label.INDICE) || "",
           coleccion: label.COLECCION || "",
           seccion: label.SECCION || "",
           secuencia: label.SECUENCIA,
@@ -47,7 +68,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       });
     },
 
-    
+
     //Obtiene todas las etiquetas y valores desde el backend.
     fetchLabels: function () {
       const url =
@@ -59,7 +80,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
           url: url,
           type: "POST",
           contentType: "application/json",
-          data: JSON.stringify({}), 
+          data: JSON.stringify({}),
           success: (result) => {
             try {
               const apiData = result.data?.[0]?.dataRes || [];
@@ -82,7 +103,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       this._operations.push(operation);
     },
 
-    
+
     // Guarda las operaciones pendientes.
     saveChanges: function () {
       if (this._operations.length === 0) {

@@ -2,13 +2,13 @@
     xmlns="sap.m"
     xmlns:core="sap.ui.core"
     xmlns:form="sap.ui.layout.form">
-    
+
     <Dialog
         title="Nuevo Catálogo"
         contentWidth="500px"
         resizable="true"
         draggable="true">
-        
+
         <content>
             <form:SimpleForm
                 editable="true"
@@ -26,62 +26,64 @@
                 columnsL="1"
                 columnsM="1"
                 singleContainerFullSize="false">
-                
+
                 <form:content>
-                    
-                    <Label text="ID Sociedad" required="true"/>
-                    <Input id="inputIdSociedad" placeholder="Ej: 1000"/>
-                    
-                    <Label text="ID CEDI" required="true"/>
-                    <Input id="inputIdCedi" placeholder="Ej: 1"/>
-                    
-                    <Label text="ID Etiqueta" required="true"/>
-                    <Input id="inputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO"/>
-                    
-                    <Label text="Etiqueta" required="true"/>
-                    <Input id="inputEtiqueta" placeholder="Ej: Tipo de Producto"/>
-                    
-                    <Label text="Índice"/>
-                    <Input id="inputIndice" placeholder="Índice"/>
-                    
-                    <Label text="Colección"/>
-                    <Input id="inputColeccion" placeholder="Colección"/>
-                    
-                    <Label text="Sección"/>
-                    <Input id="inputSeccion" placeholder="Sección"/>
-                    
-                    <Label text="Secuencia"/>
-                    <Input id="inputSecuencia" type="Number" placeholder="0"/>
-                    
-                    <Label text="Imagen"/>
-                    <Input id="inputImagen" placeholder="URL de la imagen"/>
-                    
-                    <Label text="Ruta"/>
-                    <Input id="inputRuta" placeholder="Ruta"/>
-                    
-                    <Label text="Descripción"/>
+
+                    <Label text="ID Sociedad" required="true" />
+                    <Input id="inputIdSociedad" placeholder="Ej: 1000" />
+
+                    <Label text="ID CEDI" required="true" />
+                    <Input id="inputIdCedi" placeholder="Ej: 1" />
+
+                    <Label text="ID Etiqueta" required="true" />
+                    <Input id="inputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO" />
+
+                    <Label text="Etiqueta" required="true" />
+                    <Input id="inputEtiqueta" placeholder="Ej: Tipo de Producto" />
+
+                    <Label text="Índice" />
+                    <MultiInput id="fragmentInputIndice"
+                        placeholder="Escribe etiquetas y presiona Enter..."
+                        submit=".onFragmentSubmit" />
+
+                    <Label text="Colección" />
+                    <Input id="inputColeccion" placeholder="Colección" />
+
+                    <Label text="Sección" />
+                    <Input id="inputSeccion" placeholder="Sección" />
+
+                    <Label text="Secuencia" />
+                    <Input id="inputSecuencia" type="Number" placeholder="0" />
+
+                    <Label text="Imagen" />
+                    <Input id="inputImagen" placeholder="URL de la imagen" />
+
+                    <Label text="Ruta" />
+                    <Input id="inputRuta" placeholder="Ruta" />
+
+                    <Label text="Descripción" />
                     <TextArea
                         id="textAreaDescripcion"
                         rows="3"
-                        placeholder="Descripción del catálogo"/>
-                    
+                        placeholder="Descripción del catálogo" />
+
                 </form:content>
             </form:SimpleForm>
         </content>
-        
+
         <beginButton>
             <Button
                 text="Guardar"
                 type="Emphasized"
-                press=".onSaveNewCatalogo"/>
+                press=".onSaveNewCatalogo" />
         </beginButton>
-        
+
         <endButton>
             <Button
                 text="Cancelar"
-                press=".onCloseNewCatalogo"/>
+                press=".onCloseNewCatalogo" />
         </endButton>
-        
+
     </Dialog>
-    
+
 </core:FragmentDefinition>

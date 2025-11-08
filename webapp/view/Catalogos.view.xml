@@ -59,7 +59,7 @@
                 <SearchField
                     id="searchField"
                     placeholder="Buscar etiqueta, descripción, colección o sección..."
-                    liveChange=".onSearch"  
+                    liveChange=".onSearch"
                     showSearchButton="true"
                     width="100%"
                     class="sapUiSmallMarginBottom" />
@@ -139,10 +139,19 @@
                         </table:Column>
 
                         <!-- INDICE -->
-                        <table:Column width="150px" sortProperty="indice" filterProperty="indice">
+                        <table:Column width="250px">
                             <Label text="Índice" />
                             <table:template>
-                                <Text text="{indice}" wrapping="false" />
+                                <MultiInput
+                                    editable="false"
+                                    tokens="{path: 'indice', templateShareable: false}"
+                                    tokenUpdate="onTokenUpdate"
+                                    showValueHelp="false"
+                                    width="100%">
+                                    <tokens>
+                                        <Token key="{key}" text="{text}" />
+                                    </tokens>
+                                </MultiInput>
                             </table:template>
                         </table:Column>
 

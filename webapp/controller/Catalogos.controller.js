@@ -3,8 +3,9 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "com/cat/sapfioricatalogs/service/labelService",
     "sap/m/MessageBox",
-    "sap/m/MessageToast"
-], function (Controller, JSONModel, LabelService, MessageBox, MessageToast) {
+    "sap/m/MessageToast",
+    "sap/m/Token"
+], function (Controller, JSONModel, LabelService, MessageBox, MessageToast, Token) {
     "use strict";
 
     return Controller.extend("com.cat.sapfioricatalogs.controller.Catalogos", {
@@ -41,7 +42,7 @@ sap.ui.define([
                 .then((data) => {
                     const dataModel = this.getView().getModel();
                     dataModel.setProperty("/labels", data);
-                    
+
                     let totalRows = data.length;
                     data.forEach(parent => {
                         if (parent.children) {
@@ -49,7 +50,7 @@ sap.ui.define([
                         }
                     });
                     viewModel.setProperty("/totalRows", totalRows);
-                    
+
                     MessageToast.show("Datos cargados correctamente");
                 })
                 .catch((error) => {
@@ -71,7 +72,7 @@ sap.ui.define([
                 // Obtener la lista de todos los índices seleccionados
                 aSelectedIndices = oBinding.getSelectedIndices();
             }
-            
+
             // Actualizar el conteo para el botón eliminar
             viewModel.setProperty("/selectionCount", aSelectedIndices.length);
 
@@ -79,12 +80,12 @@ sap.ui.define([
             if (aSelectedIndices.length === 1) {
                 // Si hay solo uno seleccionado
                 // Obtener el índice del arreglo
-                const iSelectedIndex = aSelectedIndices[0]; 
-                
+                const iSelectedIndex = aSelectedIndices[0];
+
                 // Usamos ese índice para obtener el objeto
                 const oContext = oTable.getContextByIndex(iSelectedIndex);
                 const selectedRow = oContext.getObject();
-                
+
                 // Establecemos el selectedLabel
                 viewModel.setProperty("/selectedLabel", selectedRow);
             } else {
@@ -93,63 +94,119 @@ sap.ui.define([
             }
         },
 
+        //Se dispara cuando el usuario agrega (Enter) o elimina un token del MultiInput.
+        onTokenUpdate: function (oEvent) {
+            const sType = oEvent.getParameter("type"); // "added" o "removed"
+            const oSource = oEvent.getSource(); // El MultiInput
+
+            // Obtenemos el contexto (la fila) que se está editando
+            const oBindingContext = oSource.getBindingContext();
+            if (!oBindingContext) return;
+
+            const sBindingPath = oBindingContext.getPath(); // ej: "/labels/0" o "/labels/0/children/1"
+            const oModel = this.getView().getModel();
+
+            // 1. Obtener el array actual de tokens del modelo
+            let aTokens = oModel.getProperty(sBindingPath + "/indice") || [];
+
+            if (sType === "added") {
+                // 2. Si se agregó un token, lo añadimos al array del modelo
+                const aAddedTokens = oEvent.getParameter("addedTokens");
+                aAddedTokens.forEach(function (oToken) {
+                    // Verificamos que no esté duplicado antes de añadir
+                    if (!aTokens.find(t => t.key === oToken.getKey())) {
+                        aTokens.push({
+                            key: oToken.getKey(),
+                            text: oToken.getText()
+                        });
+                    }
+                });
+            } else if (sType === "removed") {
+                // 3. Si se eliminó, lo quitamos del array del modelo
+                const aRemovedTokens = oEvent.getParameter("removedTokens");
+                const aRemovedKeys = aRemovedTokens.map(t => t.getKey());
+
+                aTokens = aTokens.filter(function (oToken) {
+                    return !aRemovedKeys.includes(oToken.key);
+                });
+            }
+
+            // 4. Actualizar el modelo con el nuevo array
+            oModel.setProperty(sBindingPath + "/indice", aTokens);
+        },
+
         onNewCatalogo: function () {
-            if (!this._newCatalogoDialog) {
-                this.loadFragment({
+            if (!this._pNewCatalogoDialog) {
+                this._pNewCatalogoDialog = this.loadFragment({
                     name: "com.cat.sapfioricatalogs.view.fragments.NewCatalogo"
                 }).then((oDialog) => {
-                    this._newCatalogoDialog = oDialog;
-                    this._newCatalogoDialog.open();
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
                 });
-            } else {
-                this._newCatalogoDialog.open();
             }
+
+            this._pNewCatalogoDialog.then(function (oDialog) {
+                oDialog.open();
+            });
         },
 
         onNewValor: function () {
-            const viewModel = this.getView().getModel("view");
-            const selectedLabel = viewModel.getProperty("/selectedLabel");
-
-            if (!selectedLabel || !selectedLabel.parent) {
-                MessageBox.warning("Por favor, seleccione una etiqueta padre para agregar un valor.");
+            const selectedContext = this.getView().byId("treeTable").getBinding().getSelection();
+            if (!selectedContext || selectedContext.length === 0) {
+                MessageBox.error("Por favor, seleccione un catálogo (fila padre) primero.");
+                return;
+            }
+            const oSelectedObject = selectedContext[0].getObject();
+            if (!oSelectedObject.parent) {
+                MessageBox.error("Solo puede agregar valores a un catálogo (fila padre).");
                 return;
             }
 
-            if (!this._newValorDialog) {
-                this.loadFragment({
+            if (!this._pNewValorDialog) {
+                this._pNewValorDialog = this.loadFragment({
                     name: "com.cat.sapfioricatalogs.view.fragments.NewValor"
                 }).then((oDialog) => {
-                    this._newValorDialog = oDialog;
-                    this._newValorDialog.open();
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
                 });
-            } else {
-                this._newValorDialog.open();
             }
+
+            this._pNewValorDialog.then((oDialog) => {
+                const oValorModel = new JSONModel({
+                    parentKey: oSelectedObject.idetiqueta,
+                    idsociedad: oSelectedObject.idsociedad,
+                    idcedi: oSelectedObject.idcedi
+                });
+                oDialog.setModel(oValorModel, "newValor");
+                oDialog.open();
+            });
         },
 
         onUpdate: function () {
-            const viewModel = this.getView().getModel("view");
-            const selectedLabel = viewModel.getProperty("/selectedLabel");
+            const oTable = this.byId("treeTable");
+            const aSelectedIndices = oTable.getSelectedIndices();
 
-            if (!selectedLabel) {
-                MessageBox.warning("Por favor, seleccione un registro para modificar.");
+            if (aSelectedIndices.length !== 1) {
+                MessageBox.error("Por favor, seleccione una única fila para modificar.");
                 return;
             }
+            const oContext = oTable.getContextByIndex(aSelectedIndices[0]);
+            const oSelectedData = oContext.getObject();
+            const oUpdateData = JSON.parse(JSON.stringify(oSelectedData));
 
-            if (!this._updateDialog) {
-                this.loadFragment({
+            if (!this._pUpdateDialog) {
+                this._pUpdateDialog = this.loadFragment({
                     name: "com.cat.sapfioricatalogs.view.fragments.UpdateCatalogo"
                 }).then((oDialog) => {
-                    this._updateDialog = oDialog;
-                    const updateModel = new JSONModel(selectedLabel);
-                    this._updateDialog.setModel(updateModel, "update");
-                    this._updateDialog.open();
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
                 });
-            } else {
-                const updateModel = new JSONModel(selectedLabel);
-                this._updateDialog.setModel(updateModel, "update");
-                this._updateDialog.open();
             }
+
+            this._pUpdateDialog.then((oDialog) => {
+                oDialog.setModel(new JSONModel(oUpdateData), "update");
+                oDialog.open();
+            });
         },
 
         onDelete: function () {
@@ -176,10 +233,10 @@ sap.ui.define([
                     title: "Confirmar eliminación",
                     onClose: (oAction) => {
                         if (oAction === MessageBox.Action.OK) {
-                            
+
                             // Iterar sobre los objetos y los añadimos al servicio
                             aRecordsToDelete.forEach(oRecord => {
-                                this._deleteRecord(oRecord); 
+                                this._deleteRecord(oRecord);
                             });
 
                             // Modificar el modelo
@@ -220,7 +277,7 @@ sap.ui.define([
 
                             // Asignar el nuevo arreglo al modelo
                             dataModel.setProperty("/labels", updatedLabels);
-                            
+
                             // Limpiar la UI
                             MessageToast.show(`${aRecordsToDelete.length} registro(s) marcado(s) para eliminación`);
                             oTable.clearSelection();
@@ -241,7 +298,7 @@ sap.ui.define([
 
             console.log("Adding DELETE operation:", operation);
             this._labelService.addOperation(operation);
-            
+
         },
 
         onSaveChanges: function () {
@@ -252,7 +309,7 @@ sap.ui.define([
                 .then((result) => {
                     if (result.success) {
                         viewModel.setProperty("/saveMessage", result.message);
-                        
+
                         setTimeout(() => {
                             viewModel.setProperty("/saveMessage", "");
                         }, 3000);
@@ -283,32 +340,122 @@ sap.ui.define([
         },
 
         onCloseNewCatalogo: function () {
-            this._newCatalogoDialog.close();
+            // --- Limpiamos los campos ---
+            this.byId("inputIdSociedad")?.setValue("");
+            this.byId("inputIdCedi")?.setValue("");
+            this.byId("inputIdEtiqueta")?.setValue("");
+            this.byId("inputEtiqueta")?.setValue("");
+            this.byId("fragmentInputIndice")?.setTokens([]); // Limpiamos el MultiInput
+            this.byId("inputColeccion")?.setValue("");
+            this.byId("inputSeccion")?.setValue("");
+            this.byId("inputSecuencia")?.setValue("0");
+            this.byId("inputImagen")?.setValue("");
+            this.byId("inputRuta")?.setValue("");
+            this.byId("textAreaDescripcion")?.setValue("");
+            if (this._pNewCatalogoDialog) {
+                this._pNewCatalogoDialog.then(function (oDialog) {
+                    oDialog.close();
+                });
+            }
         },
 
         onCloseNewValor: function () {
-            this._newValorDialog.close();
+            if (this._pNewValorDialog) {
+                this._pNewValorDialog.then(function (oDialog) {
+                    oDialog.close();
+                });
+            }
         },
 
         onCloseUpdate: function () {
-            this._updateDialog.close();
+            if (this._pUpdateDialog) {
+                this._pUpdateDialog.then(function (oDialog) {
+                    oDialog.close();
+                });
+            }
+        },
+
+        /**
+         * Se dispara cuando el usuario presiona Enter en el MultiInput del fragmento.
+         */
+        onFragmentSubmit: function (oEvent) {
+            const oMultiInput = oEvent.getSource();
+            const sValue = oEvent.getParameter("value"); // Texto que el usuario escribió
+
+            if (sValue && sValue.trim() !== "") {
+                // 1. Crear un nuevo Token
+                const oNewToken = new Token({
+                    key: sValue.trim(),
+                    text: sValue.trim()
+                });
+
+                // 2. Añadir el token al MultiInput
+                oMultiInput.addToken(oNewToken);
+            }
+
+            // 3. Limpiar el campo de texto del MultiInput
+            oMultiInput.setValue("");
         },
 
         onSaveNewCatalogo: function () {
-            // Implementar lógica de guardado
+            // 1. Leer todos los valores del formulario del fragmento
+            const oView = this.getView();
+            const sSociedad = oView.byId("inputIdSociedad").getValue();
+            const sCedi = oView.byId("inputIdCedi").getValue();
+            const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
+            const sEtiqueta = oView.byId("inputEtiqueta").getValue();
+
+            // --- 2. Leer los Tokens del MultiInput ---
+            const oMultiInput = oView.byId("fragmentInputIndice");
+            const aTokens = oMultiInput.getTokens();
+
+            // 3. Convertir los tokens en un string separado por comas
+            const sIndice = aTokens.map(oToken => oToken.getKey()).join(',');
+            // -------------------------------------------
+
+            const sColeccion = oView.byId("inputColeccion").getValue();
+            const sSeccion = oView.byId("inputSeccion").getValue();
+            const iSecuencia = parseInt(oView.byId("inputSecuencia").getValue() || "0", 10);
+            const sImagen = oView.byId("inputImagen").getValue();
+            const sRuta = oView.byId("inputRuta").getValue();
+            const sDescripcion = oView.byId("textAreaDescripcion").getValue();
+
+            // 4. Validar campos requeridos (ejemplo)
+            if (!sSociedad || !sCedi || !sIdEtiqueta || !sEtiqueta) {
+                MessageBox.error("Por favor, complete todos los campos requeridos.");
+                return;
+            }
+
+            // 5. Construir el objeto de datos
             const newData = {
-                // Obtener datos del formulario
+                idsociedad: sSociedad,
+                idcedi: sCedi,
+                idetiqueta: sIdEtiqueta,
+                etiqueta: sEtiqueta,
+                indice: sIndice, // Aquí va nuestro string de tokens
+                coleccion: sColeccion,
+                seccion: sSeccion,
+                secuencia: iSecuencia,
+                imagen: sImagen,
+                ruta: sRuta,
+                descripcion: sDescripcion,
+                parent: true // Asumimos que un "Nuevo Catálogo" es un 'parent'
             };
 
+            // 6. Crear la operación
             const operation = {
                 action: "CREATE",
-                type: "LABEL",
+                type: "LABEL", // 'LABEL' para catálogos, 'VALUE' para valores
                 data: newData
             };
 
+            // 7. Añadir al servicio y cerrar
             this._labelService.addOperation(operation);
-            this._newCatalogoDialog.close();
-            MessageToast.show("Catálogo agregado. No olvide guardar los cambios.");
+
+            MessageToast.show("Catálogo agregado. No olvide 'Guardar Cambios'.");
+
+            // Usamos la función de cerrar (que ahora también limpia los campos)
+            this.onCloseNewCatalogo();
         },
 
         onSaveNewValor: function () {
@@ -337,12 +484,12 @@ sap.ui.define([
             };
 
             this._labelService.addOperation(operation);
-            
+
             const dataModel = this.getView().getModel();
             const labels = dataModel.getProperty("/labels");
-            
+
             if (updatedData.parent) {
-                const updatedLabels = labels.map(label => 
+                const updatedLabels = labels.map(label =>
                     label.idetiqueta === updatedData.idetiqueta ? updatedData : label
                 );
                 dataModel.setProperty("/labels", updatedLabels);
@@ -390,6 +537,18 @@ sap.ui.define([
             }
 
             oBinding.filter(aFilters);
+        },
+
+        /**
+         * Se llama cuando la vista es destruida.
+         * Limpiamos las promesas de los diálogos.
+         * Los diálogos en sí se destruirán automáticamente 
+         * porque usamos addDependent().
+         */
+        onExit: function () {
+            this._pNewCatalogoDialog = null;
+            this._pNewValorDialog = null;
+            this._pUpdateDialog = null;
         }
 
     });
