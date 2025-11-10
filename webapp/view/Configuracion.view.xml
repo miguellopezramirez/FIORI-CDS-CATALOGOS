@@ -16,6 +16,21 @@
                     </items>
                 </Select>
             </VBox>
+            
+            <VBox class="sapUiSmallMarginTop">
+                <Label text="Seleccionar Tema" design="Bold" class="sapUiSmallMarginBottom" />
+                <Select 
+                    id="themeSelectionList" 
+                    selectedKey="{config>/selectedTheme}" 
+                    change=".onThemeSelectionChange" 
+                    width="250px">
+                    <items>
+                        <core:Item key="sap_horizon" text="Claro (Light Mode)" />
+                        <core:Item key="sap_horizon_dark" text="Oscuro (Dark Mode)" />
+                    </items>
+                </Select>
+            </VBox>
+            
         </content>
     </Page>
 </mvc:View>
