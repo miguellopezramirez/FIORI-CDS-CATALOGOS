@@ -487,20 +487,82 @@ sap.ui.define([
             MessageToast.show("Valor agregado. No olvide guardar los cambios.");
         },
 
-        onSaveUpdate: function () {
-            const updateModel = this._updateDialog.getModel("update");
+        onSaveUpdate: function (oEvent) {
+            const oDialog = oEvent?.getSource()?.getParent?.() || this._updateDialog;
+            if (!oDialog) {
+                MessageBox.error("No se encontró el diálogo de actualización.");
+                return;
+            }
+            const updateModel = oDialog.getModel("update");
+            if (!updateModel) {
+                MessageBox.error("No se encontró el modelo 'update' en el diálogo.");
+                return;
+            }
             const updatedData = updateModel.getData();
-
-            const operation = {
-                action: "UPDATE",
-                data: updatedData
+        
+            // Helper: tokens -> string "a,b,c"
+            const tokensToString = function (value) {
+                if (Array.isArray(value)) {
+                    return value
+                        .map(t => (typeof t === "string" ? t : (t.key || t.text || "")))
+                        .filter(Boolean)
+                        .join(",");
+                }
+                return value || "";
             };
-
+        
+            updatedData.status = "Warning";
+        
+            let operation;
+            if (updatedData.parent) {
+                // UPDATE de etiqueta (labels)
+                const updates = {
+                    ETIQUETA: updatedData.etiqueta,
+                    INDICE: tokensToString(updatedData.indice),
+                    COLECCION: updatedData.coleccion || "",
+                    SECCION: updatedData.seccion || "",
+                    SECUENCIA: Number(updatedData.secuencia) || 0,
+                    IMAGEN: updatedData.imagen || "",
+                    ROUTE: updatedData.ruta || "",
+                    DESCRIPCION: updatedData.descripcion || ""
+                };
+        
+                operation = {
+                    collection: "labels",
+                    action: "UPDATE",
+                    payload: {
+                        id: updatedData.idetiqueta,
+                        updates: updates
+                    }
+                };
+            } else {
+                // UPDATE de valor (values)
+                const updates = {
+                    VALOR: updatedData.valor,
+                    ALIAS: updatedData.alias || "",
+                    SECUENCIA: Number(updatedData.secuencia) || 0,
+                    IMAGEN: updatedData.imagen || "",
+                    ROUTE: updatedData.ruta || "",
+                    DESCRIPCION: updatedData.descripcion || "",
+                    IDVALORPA: updatedData.idvalorpa || undefined
+                };
+        
+                operation = {
+                    collection: "values",
+                    action: "UPDATE",
+                    payload: {
+                        id: updatedData.idvalor,
+                        updates: updates
+                    }
+                };
+            }
+        
             this._labelService.addOperation(operation);
-
+        
+            // Actualiza modelo local y cierra
             const dataModel = this.getView().getModel();
             const labels = dataModel.getProperty("/labels");
-
+        
             if (updatedData.parent) {
                 const updatedLabels = labels.map(label =>
                     label.idetiqueta === updatedData.idetiqueta ? updatedData : label
@@ -508,11 +570,11 @@ sap.ui.define([
                 dataModel.setProperty("/labels", updatedLabels);
             } else {
                 const updatedLabels = labels.map(label => {
-                    if (label.idetiqueta === updatedData.parentKey) {
+                    if (label.idetiqueta === (updatedData.parentKey || label.idetiqueta)) {
                         return {
                             ...label,
-                            children: label.children.map(child =>
-                                child.idvalor === updatedData.idvalor ? updatedData : child
+                            children: (label.children || []).map(child =>
+                                child.idvalor === updatedData.idvalor ? { ...updatedData } : child
                             )
                         };
                     }
@@ -520,8 +582,9 @@ sap.ui.define([
                 });
                 dataModel.setProperty("/labels", updatedLabels);
             }
-
-            this._updateDialog.close();
+        
+            oDialog.close();
+            MessageToast.show("Cambios guardados localmente. La fila se marcó como Warning.");
             MessageToast.show("Cambios guardados. No olvide confirmar los cambios.");
         },
 

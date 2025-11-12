@@ -20,37 +20,38 @@
                 
                 <form:content>
                     <Label text="ID Sociedad" required="true"/>
-                    <Input id="updateInputIdSociedad" placeholder="Ej: 1000"/>
+                    <Input id="updateInputIdSociedad"  value= "{update>/idsociedad}"/>
                     
                     <Label text="ID CEDI" required="true"/>
-                    <Input id="updateInputIdCedi" placeholder="Ej: 1"/>
+                    <Input id="updateInputIdCedi" placeholder="Ej: 1" value= "{update>/idcedi}"/>
                     
                     <Label text="ID Etiqueta" required="true"/>
-                    <Input id="updateInputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO"/>
+                    <Input id="updateInputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO" value= "{update>/idetiqueta}"/>
                     
                     <Label text="Etiqueta" required="true"/>
-                    <Input id="updateInputEtiqueta" placeholder="Ej: Tipo de Producto"/>
+                    <Input id="updateInputEtiqueta" placeholder="Ej: Tipo de Producto" value= "{update>/etiqueta}"/> 
 
                     <Label text="Valor" />
-                    <Input id="updateInputValor" placeholder="Ej: Color Rojo"/>
+                    <Input id="updateInputValor" placeholder="Ej: Color Rojo" value= "{update>/valor}"/>
 
                     <Label text="ID Valor" />
-                    <Input id="updateInputIdValor" placeholder="Ej: ROJO"/>
+                    <Input id="updateInputIdValor" placeholder="Ej: ROJO" value= "{update>/idvalorpa}"/>
                     
                     <Label text="Secuencia"/>
-                    <Input id="updateInputSecuencia" type="Number" placeholder="0"/>
+                    <Input id="updateInputSecuencia" type="Number" placeholder="0" value= "{update>/secuencia}"/>
                     
                     <Label text="Imagen"/>
-                    <Input id="updateInputImagen" placeholder="URL de la imagen"/>
+                    <Input id="updateInputImagen" placeholder="URL de la imagen" value= "{update>/imagen}"/>
                     
                     <Label text="Ruta"/>
-                    <Input id="updateInputRuta" placeholder="Ruta"/>
+                    <Input id="updateInputRuta" placeholder="Ruta" value= "{update>/ruta}"/>
                     
                     <Label text="Descripción"/>
                     <TextArea
                         id="updateTextAreaDescripcion"
                         rows="3"
-                        placeholder="Descripción"/>
+                        placeholder="Descripción"
+                        value= "{update>/descripcion}"/>    
                     
                 </form:content>
             </form:SimpleForm>
