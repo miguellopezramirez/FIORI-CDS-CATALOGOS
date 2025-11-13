@@ -395,56 +395,94 @@ sap.ui.define([
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
 
-            // --- 2. Leer los Tokens del MultiInput ---
+            // 2. Leer los Tokens del MultiInput
             const oMultiInput = oView.byId("fragmentInputIndice");
             const aTokens = oMultiInput.getTokens();
 
-            // 3. Convertir los tokens en un string separado por comas
-            const sIndice = aTokens.map(oToken => oToken.getKey()).join(',');
-            // -------------------------------------------
-
-            const sColeccion = oView.byId("inputColeccion").getValue();
-            const sSeccion = oView.byId("inputSeccion").getValue();
-            const iSecuencia = parseInt(oView.byId("inputSecuencia").getValue() || "0", 10);
-            const sImagen = oView.byId("inputImagen").getValue();
-            const sRuta = oView.byId("inputRuta").getValue();
-            const sDescripcion = oView.byId("textAreaDescripcion").getValue();
-
-            // 4. Validar campos requeridos (ejemplo)
+            // 3. Validar campos requeridos
             if (!sSociedad || !sCedi || !sIdEtiqueta || !sEtiqueta) {
                 MessageBox.error("Por favor, complete todos los campos requeridos.");
                 return;
             }
 
-            // 5. Construir el objeto de datos
+            // --- PASO 4: Preparar datos para el MODELO LOCAL y la API ---
+
+            // Para el MODELO LOCAL (la tabla):
+            // El MultiInput de tu tabla espera un array de objetos: [{key: "...", text: "..."}]
+            const aIndiceAsObjects = aTokens.map(oToken => ({
+                key: oToken.getKey(),
+                text: oToken.getText()
+            }));
+
+            // Para la API (el payload):
+            // Tu API parece esperar un string separado por comas
+            const sIndiceForAPI = aTokens.map(oToken => oToken.getKey()).join(',');
+
+            // 5. Construir el objeto de datos para el MODELO LOCAL (minúsculas)
+            // Este objeto se insertará en la tabla visualmente
             const newData = {
                 idsociedad: sSociedad,
                 idcedi: sCedi,
                 idetiqueta: sIdEtiqueta,
                 etiqueta: sEtiqueta,
-                indice: sIndice, // Aquí va nuestro string de tokens
-                coleccion: sColeccion,
-                seccion: sSeccion,
-                secuencia: iSecuencia,
-                imagen: sImagen,
-                ruta: sRuta,
-                descripcion: sDescripcion,
-                parent: true // Asumimos que un "Nuevo Catálogo" es un 'parent'
+                indice: aIndiceAsObjects, // El array de objetos para el binding
+                coleccion: oView.byId("inputColeccion").getValue(),
+                seccion: oView.byId("inputSeccion").getValue(),
+                secuencia: parseInt(oView.byId("inputSecuencia").getValue() || "0", 10),
+                imagen: oView.byId("inputImagen").getValue(),
+                ruta: oView.byId("inputRuta").getValue(),
+                descripcion: oView.byId("textAreaDescripcion").getValue(),
+                parent: true, // Es un catálogo padre
+                
+                // ¡IMPORTANTE! Marcamos la fila con un estado visual
+                // Usará el color "Success" (verde) para indicar que es nuevo
+                uiState: "Success" 
             };
 
-            // 6. Crear la operación
+            // 6. Construir el PAYLOAD para la API (MAYÚSCULAS, según tu spec)
+            const apiPayload = {
+                IDSOCIEDAD: newData.idsociedad,
+                IDCEDI: newData.idcedi,
+                IDETIQUETA: newData.idetiqueta,
+                ETIQUETA: newData.etiqueta,
+                INDICE: sIndiceForAPI, // El string para la API
+                COLECCION: newData.coleccion,
+                SECCION: newData.seccion,
+                SECUENCIA: newData.secuencia,
+                IMAGEN: newData.imagen,
+                ROUTE: newData.ruta, // Tu API de update usa ROUTE, no ruta
+                DESCRIPCION: newData.descripcion
+            };
+
+            // 7. Crear la operación (con el formato de tu API)
             const operation = {
+                collection: "labels", // Como en tu API
                 action: "CREATE",
-                type: "LABEL", // 'LABEL' para catálogos, 'VALUE' para valores
-                data: newData
+                payload: apiPayload // Como en tu API
             };
 
-            // 7. Añadir al servicio y cerrar
+            // 8. Añadir al servicio (esto NO guarda en BD, solo encola)
             this._labelService.addOperation(operation);
 
-            MessageToast.show("Catálogo agregado. No olvide 'Guardar Cambios'.");
+            // --- PASO 9: AÑADIR EL REGISTRO AL MODELO LOCAL (Esta es la magia) ---
+            const oModel = this.getView().getModel();
+            const aLabels = oModel.getProperty("/labels");
 
-            // Usamos la función de cerrar (que ahora también limpia los campos)
+            // Añadimos el nuevo registro al inicio del arreglo
+            aLabels.unshift(newData); 
+
+            // Actualizamos el modelo. La tabla se refrescará automáticamente.
+            oModel.setProperty("/labels", aLabels);
+            
+            // (Opcional) Actualizar contador total
+            const oViewModel = this.getView().getModel("view");
+            oViewModel.setProperty("/totalRows", aLabels.length); // Simplificado, ajusta si es necesario
+
+            // --------------------------------------------------------------------
+
+            MessageToast.show("Catálogo agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
+
+            // 10. Usamos la función de cerrar (que ahora también limpia los campos)
             this.onCloseNewCatalogo();
         },
 
