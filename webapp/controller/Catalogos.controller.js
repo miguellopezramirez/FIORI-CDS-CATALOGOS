@@ -224,78 +224,48 @@ sap.ui.define([
 
         onDelete: function () {
             const oTable = this.byId("treeTable");
-            const oBinding = oTable.getBinding("rows");
-            let aSelectedIndices = [];
-            if (oBinding) {
-                aSelectedIndices = oBinding.getSelectedIndices();
-            }
+            const aSelectedIndices = oTable.getSelectedIndices();
 
             if (aSelectedIndices.length === 0) {
                 MessageBox.warning("Por favor, seleccione al menos un registro para eliminar.");
                 return;
             }
 
-            // Obtener todos los objetos de registro a eliminar primero
-            const aRecordsToDelete = aSelectedIndices.map(iIndex => {
-                return oTable.getContextByIndex(iIndex).getObject();
-            });
+            // Mapear índices a contextos para no perder referencia si la tabla cambia
+            const aContexts = aSelectedIndices.map(iIndex => oTable.getContextByIndex(iIndex));
 
             MessageBox.confirm(
-                `¿Está seguro de que desea eliminar ${aRecordsToDelete.length} registro(s)?`,
+                `¿Está seguro de que desea marcar ${aSelectedIndices.length} registro(s) para eliminación?`,
                 {
                     title: "Confirmar eliminación",
                     onClose: (oAction) => {
                         if (oAction === MessageBox.Action.OK) {
+                            const oModel = this.getView().getModel();
 
-                            // Iterar sobre los objetos y los añadimos al servicio
-                            aRecordsToDelete.forEach(oRecord => {
+                            // Iterar sobre los registros seleccionados
+                            aContexts.forEach(oContext => {
+                                if (!oContext) return;
+
+                                const oRecord = oContext.getObject();
+                                const sPath = oContext.getPath();
+
+                                // 1. Encolar operación para el Backend (ADAPTADO A TU SERVICIO)
                                 this._deleteRecord(oRecord);
+
+                                // 2. Soft Delete Visual (Frontend)
+                                // Marcamos la fila en rojo usando la propiedad 'uiState'
+                                oModel.setProperty(sPath + "/uiState", "Error"); 
+                                
+                                // Opcional: Marcar estado de cambio
+                                // oRecord.status = "Deleted"; 
                             });
 
-                            // Modificar el modelo
-                            const dataModel = this.getView().getModel();
-                            let labels = dataModel.getProperty("/labels");
-
-                            // Separar padres e hijos
-                            const parentsToDelete = aRecordsToDelete.filter(r => r.parent);
-                            const childrenToDelete = aRecordsToDelete.filter(r => !r.parent);
-
-                            let updatedLabels;
-
-                            // Filtrar los padres eliminados
-                            if (parentsToDelete.length > 0) {
-                                updatedLabels = labels.filter(label => {
-                                    return !parentsToDelete.some(p => p.idetiqueta === label.idetiqueta);
-                                });
-                            } else {
-                                updatedLabels = [...labels]; // crear copia
-                            }
-
-                            // 5. Filtrar los hijos eliminados
-                            if (childrenToDelete.length > 0) {
-                                updatedLabels = updatedLabels.map(label => {
-                                    if (!label.children) return label;
-
-                                    // Filtra los hijos de este label
-                                    const newChildren = label.children.filter(child => {
-                                        return !childrenToDelete.some(c => c.idvalor === child.idvalor);
-                                    });
-
-                                    return {
-                                        ...label,
-                                        children: newChildren
-                                    };
-                                });
-                            }
-
-                            // Asignar el nuevo arreglo al modelo
-                            dataModel.setProperty("/labels", updatedLabels);
-
-                            // Limpiar la UI
-                            MessageToast.show(`${aRecordsToDelete.length} registro(s) marcado(s) para eliminación`);
+                            // Limpiar selección y contadores
                             oTable.clearSelection();
                             this.getView().getModel("view").setProperty("/selectionCount", 0);
                             this.getView().getModel("view").setProperty("/selectedLabel", null);
+
+                            MessageToast.show("Registros marcados para eliminar. Presione 'Guardar Cambios' para confirmar.");
                         }
                     }
                 }
@@ -303,16 +273,23 @@ sap.ui.define([
         },
 
         _deleteRecord: function (record) {
-            const operation = {
-                action: "DELETE",
-                type: record.parent ? "LABEL" : "VALUE",
-                data: record
-            };
+    // Tu backend espera: collection ("labels" o "values")
+    const sCollection = record.parent ? "labels" : "values";
+    
+    // Tu backend espera el ID dentro de 'payload'
+    const sId = record.parent ? record.idetiqueta : record.idvalor;
 
-            console.log("Adding DELETE operation:", operation);
-            this._labelService.addOperation(operation);
+    const operation = {
+        collection: sCollection, 
+        action: "DELETE",
+        payload: {
+            id: sId
+        }
+    };
 
-        },
+    console.log("Encolando DELETE para backend:", operation);
+    this._labelService.addOperation(operation);
+},
 
         onSaveChanges: function () {
             const viewModel = this.getView().getModel("view");

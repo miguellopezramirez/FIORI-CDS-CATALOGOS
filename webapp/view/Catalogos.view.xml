@@ -89,6 +89,11 @@
                     minAutoRowCount="10"
                     rowSelectionChange=".onRowSelectionChange"
                     class="sapUiSizeCompact">
+
+                    <table:rowSettingsTemplate>
+                        <table:RowSettings highlight="{uiState}" />
+                    </table:rowSettingsTemplate>
+
                     <table:columns>
 
                         <!-- Etiqueta/Valor -->
