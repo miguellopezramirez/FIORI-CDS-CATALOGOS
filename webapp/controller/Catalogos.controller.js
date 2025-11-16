@@ -164,13 +164,15 @@ sap.ui.define([
         },
 
         onNewValor: function () {
-            const selectedContext = this.getView().byId("treeTable").getBinding().getSelection();
-            if (!selectedContext || selectedContext.length === 0) {
+            const oViewModel = this.getView().getModel("view");
+            const oSelectedObject = oViewModel.getProperty("/selectedLabel");
+
+            if (!oSelectedObject) {
                 MessageBox.error("Por favor, seleccione un catálogo (fila padre) primero.");
                 return;
             }
-            const oSelectedObject = selectedContext[0].getObject();
-            if (!oSelectedObject.parent) {
+
+            if (oSelectedObject.parent !== true) {
                 MessageBox.error("Solo puede agregar valores a un catálogo (fila padre).");
                 return;
             }
@@ -191,6 +193,7 @@ sap.ui.define([
                     idcedi: oSelectedObject.idcedi
                 });
                 oDialog.setModel(oValorModel, "newValor");
+                this._clearNewValorForm();
                 oDialog.open();
             });
         },
@@ -350,6 +353,8 @@ sap.ui.define([
         },
 
         onCloseNewValor: function () {
+            this._clearNewValorForm();
+
             if (this._pNewValorDialog) {
                 this._pNewValorDialog.then(function (oDialog) {
                     oDialog.close();
@@ -486,20 +491,106 @@ sap.ui.define([
             this.onCloseNewCatalogo();
         },
 
-        onSaveNewValor: function () {
-            const newData = {
-                // Obtener datos del formulario
+        onSaveNewValor: function (oEvent) {
+            const oDialog = oEvent.getSource().getParent();
+            if (!oDialog) {
+                MessageBox.error("No se pudo encontrar el diálogo.");
+                return;
+            }
+
+            const oValorModel = oDialog.getModel("newValor");
+            const sParentKey = oValorModel.getProperty("/parentKey");
+            const sSociedad = oValorModel.getProperty("/idsociedad");
+            const sCedi = oValorModel.getProperty("/idcedi");
+
+            const oView = this.getView();
+            const sIdValor = oView.byId("valInputIdValor").getValue();
+            const sValor = oView.byId("valInputValor").getValue();
+
+            const aErrors = [];
+            if (!sIdValor || sIdValor.trim() === "") {
+                aErrors.push("El campo 'ID Valor' es requerido.");
+            }
+            if (!sValor || sValor.trim() === "") {
+                aErrors.push("El campo 'Valor' es requerido.");
+            }
+            if (aErrors.length > 0) {
+                MessageBox.error(aErrors.join("\n"));
+                return; 
+            }
+
+            const newLocalData = {
+                idsociedad: sSociedad,
+                idcedi: sCedi,
+                idvalor: sIdValor,
+                valor: sValor,
+                idvalorpa: oView.byId("valInputIdValorPa").getValue() || null,
+                secuencia: parseInt(oView.byId("valInputSecuencia").getValue() || "0", 10),
+                imagen: oView.byId("valInputImagen").getValue(),
+                ruta: oView.byId("valInputRuta").getValue(),
+                descripcion: oView.byId("valTextAreaDescripcion").getValue(),
+                parent: false, 
+                uiState: "Success" 
+            };
+
+            const apiPayload = {
+                IDSOCIEDAD: newLocalData.idsociedad,
+                IDCEDI: newLocalData.idcedi,
+                IDETIQUETA: sParentKey, 
+                IDVALOR: newLocalData.idvalor,
+                VALOR: newLocalData.valor,
+                IDVALORPA: newLocalData.idvalorpa || undefined, 
+                SECUENCIA: newLocalData.secuencia,
+                IMAGEN: newLocalData.imagen,
+                ROUTE: newLocalData.ruta, 
+                DESCRIPCION: newLocalData.descripcion
             };
 
             const operation = {
+                collection: "values", 
                 action: "CREATE",
-                type: "VALUE",
-                data: newData
+                payload: apiPayload 
             };
 
             this._labelService.addOperation(operation);
-            this._newValorDialog.close();
-            MessageToast.show("Valor agregado. No olvide guardar los cambios.");
+            const oModel = this.getView().getModel();
+            const aLabels = oModel.getProperty("/labels");
+
+            let sParentPath = "";
+            let iParentIndex = -1;
+            for (let i = 0; i < aLabels.length; i++) {
+                if (aLabels[i].idetiqueta === sParentKey) {
+                    sParentPath = "/labels/" + i;
+                    iParentIndex = i;
+                    break;
+                }
+            }
+
+            if (sParentPath) {
+                const sChildrenPath = sParentPath + "/children";
+                let aChildren = oModel.getProperty(sChildrenPath);
+                if (!aChildren || !Array.isArray(aChildren)) {
+                    aChildren = [];
+                }
+
+                aChildren.push(newLocalData); 
+
+                oModel.setProperty(sChildrenPath, aChildren);
+                
+                const oTable = this.byId("treeTable");
+                if (iParentIndex > -1 && !oTable.isExpanded(iParentIndex)) {
+                    oTable.expand(iParentIndex);
+                }
+                
+            } else {
+                console.error("No se encontró el catálogo padre '" + sParentKey + "' en el modelo local.");
+                MessageBox.error("Error: No se pudo encontrar el catálogo padre para añadir el valor.");
+                return;
+            }
+
+            MessageToast.show("Valor agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
+
+            this.onCloseNewValor();
         },
 
         onSaveUpdate: function (oEvent) {
@@ -525,8 +616,21 @@ sap.ui.define([
                 }
                 return value || "";
             };
+
+            if (updatedData.parent === true) {
+                if (!updatedData.etiqueta || updatedData.etiqueta.trim() === "") {
+                    MessageBox.error("El campo 'Etiqueta' no puede estar vacío.");
+                    return; 
+                }
+            } 
+            else { 
+                if (!updatedData.valor || updatedData.valor.trim() === "") {
+                    MessageBox.error("El campo 'Valor' no puede estar vacío.");
+                    return;
+                }
+            }
         
-            updatedData.status = "Warning";
+            updatedData.uiState = "Warning";
         
             let operation;
             if (updatedData.parent) {
@@ -640,7 +744,21 @@ sap.ui.define([
             this._pNewCatalogoDialog = null;
             this._pNewValorDialog = null;
             this._pUpdateDialog = null;
-        }
+        },
+
+        /**
+         * Limpia los campos del formulario de Nuevo Valor.
+         */
+        _clearNewValorForm: function() {
+            // Usamos los IDs del NewValor.fragment.xml
+            this.byId("valInputIdValor")?.setValue("");
+            this.byId("valInputValor")?.setValue("");
+            this.byId("valInputIdValorPa")?.setValue("");
+            this.byId("valInputSecuencia")?.setValue("0");
+            this.byId("valInputImagen")?.setValue("");
+            this.byId("valInputRuta")?.setValue("");
+            this.byId("valTextAreaDescripcion")?.setValue("");
+        },
 
     });
 });

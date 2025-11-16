@@ -20,23 +20,50 @@
                 
                 <form:content>
                     <Label text="ID Sociedad" required="true"/>
-                    <Input id="updateInputIdSociedad"  value= "{update>/idsociedad}"/>
+                    <Input id="updateInputIdSociedad" 
+                           value= "{update>/idsociedad}" 
+                           editable="false"/>
                     
                     <Label text="ID CEDI" required="true"/>
-                    <Input id="updateInputIdCedi" placeholder="Ej: 1" value= "{update>/idcedi}"/>
-                    
-                    <Label text="ID Etiqueta" required="true"/>
-                    <Input id="updateInputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO" value= "{update>/idetiqueta}"/>
-                    
-                    <Label text="Etiqueta" required="true"/>
-                    <Input id="updateInputEtiqueta" placeholder="Ej: Tipo de Producto" value= "{update>/etiqueta}"/> 
+                    <Input id="updateInputIdCedi" 
+                           value= "{update>/idcedi}" 
+                           editable="false"/>
 
-                    <Label text="Valor" />
-                    <Input id="updateInputValor" placeholder="Ej: Color Rojo" value= "{update>/valor}"/>
-
-                    <Label text="ID Valor" />
-                    <Input id="updateInputIdValor" placeholder="Ej: ROJO" value= "{update>/idvalorpa}"/>
+                    <Label text="ID Etiqueta" required="true"
+                           visible="{= ${update>/parent} === true }"/>
+                    <Input id="updateInputIdEtiqueta" 
+                           value= "{update>/idetiqueta}" 
+                           editable="false"
+                           visible="{= ${update>/parent} === true }"/>
                     
+                    <Label text="Etiqueta" required="true"
+                           visible="{= ${update>/parent} === true }"/>
+                    <Input id="updateInputEtiqueta" 
+                           value= "{update>/etiqueta}"
+                           visible="{= ${update>/parent} === true }"/> 
+                    
+                    <Label text="ID Valor" required="true"
+                           visible="{= ${update>/parent} === false }"/>
+                    <Input id="updateInputIdValor" 
+                           value= "{update>/idvalor}" 
+                           editable="false"
+                           visible="{= ${update>/parent} === false }"/>
+
+                    <Label text="Valor" required="true"
+                           visible="{= ${update>/parent} === false }"/>
+                    <Input id="updateInputValor" 
+                           placeholder="Ej: Color Rojo" 
+                           value= "{update>/valor}"
+                           visible="{= ${update>/parent} === false }"/>
+                    
+                    <Label text="Valor Padre"
+                           visible="{= ${update>/parent} === false }"/>
+                    <Input id="updateInputIdValorPa" 
+                           placeholder="Ej: COLORES (Opcional)" 
+                           value= "{update>/idvalorpa}"
+                           visible="{= ${update>/parent} === false }"/>
+
+
                     <Label text="Secuencia"/>
                     <Input id="updateInputSecuencia" type="Number" placeholder="0" value= "{update>/secuencia}"/>
                     
