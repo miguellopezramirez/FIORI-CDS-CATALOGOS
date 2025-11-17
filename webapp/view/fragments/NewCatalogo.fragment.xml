@@ -30,16 +30,34 @@
                 <form:content>
 
                     <Label text="ID Sociedad" required="true" />
-                    <Input id="inputIdSociedad" type="Number" placeholder="1000" />
+                    <Input 
+                        id="inputIdSociedad" 
+                        type="Number" 
+                        placeholder="1000"
+                        valueState="{/validationState/idSociedad}"
+                        valueStateText="Este campo es obligatorio" />
 
                     <Label text="ID CEDI" required="true" />
-                    <Input id="inputIdCedi" type="Number" placeholder="1" />
+                    <Input 
+                        id="inputIdCedi" 
+                        type="Number" 
+                        placeholder="1"
+                        valueState="{/validationState/idCedi}"
+                        valueStateText="Este campo es obligatorio" />
 
                     <Label text="ID Etiqueta" required="true" />
-                    <Input id="inputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO" />
+                    <Input 
+                        id="inputIdEtiqueta" 
+                        placeholder="Ej: TIPO_PRODUCTO"
+                        valueState="{/validationState/idEtiqueta}"
+                        valueStateText="Este campo es obligatorio" />
 
                     <Label text="Etiqueta" required="true" />
-                    <Input id="inputEtiqueta" placeholder="Ej: Tipo de Producto" />
+                    <Input 
+                        id="inputEtiqueta" 
+                        placeholder="Ej: Tipo de Producto"
+                        valueState="{/validationState/etiqueta}"
+                        valueStateText="Este campo es obligatorio" />
 
                     <Label text="Índice" />
                     <MultiInput id="fragmentInputIndice"

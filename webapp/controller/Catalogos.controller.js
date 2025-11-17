@@ -332,26 +332,6 @@ sap.ui.define([
             this._loadLabels();
         },
 
-        onCloseNewCatalogo: function () {
-            // --- Limpiamos los campos ---
-            this.byId("inputIdSociedad")?.setValue("");
-            this.byId("inputIdCedi")?.setValue("");
-            this.byId("inputIdEtiqueta")?.setValue("");
-            this.byId("inputEtiqueta")?.setValue("");
-            this.byId("fragmentInputIndice")?.setTokens([]); // Limpiamos el MultiInput
-            this.byId("inputColeccion")?.setValue("");
-            this.byId("inputSeccion")?.setValue("");
-            this.byId("inputSecuencia")?.setValue("0");
-            this.byId("inputImagen")?.setValue("");
-            this.byId("inputRuta")?.setValue("");
-            this.byId("textAreaDescripcion")?.setValue("");
-            if (this._pNewCatalogoDialog) {
-                this._pNewCatalogoDialog.then(function (oDialog) {
-                    oDialog.close();
-                });
-            }
-        },
-
         onCloseNewValor: function () {
             this._clearNewValorForm();
 
@@ -392,103 +372,199 @@ sap.ui.define([
             oMultiInput.setValue("");
         },
 
+        // Método para abrir el diálogo (inicializa el estado de validación)
+
+
+        // Inicializar el modelo de validación
+        _initValidationModel: function() {
+            const oView = this.getView();
+            const oModel = oView.getModel();
+            
+            // Resetear estados de validación
+            oModel.setProperty("/validationState", {
+                idSociedad: "None",
+                idCedi: "None",
+                idEtiqueta: "None",
+                etiqueta: "None"
+            });
+        },
+
+        // Validar todos los campos requeridos
+        _validateRequiredFields: function() {
+            const oView = this.getView();
+            const oModel = oView.getModel();
+            
+            let isValid = true;
+            const validationState = {
+                idSociedad: "None",
+                idCedi: "None",
+                idEtiqueta: "None",
+                etiqueta: "None"
+            };
+            
+            // Validar ID Sociedad
+            const sSociedad = oView.byId("inputIdSociedad").getValue();
+            if (!sSociedad || sSociedad.trim() === "") {
+                validationState.idSociedad = "Error";
+                isValid = false;
+            }
+            
+            // Validar ID CEDI
+            const sCedi = oView.byId("inputIdCedi").getValue();
+            if (!sCedi || sCedi.trim() === "") {
+                validationState.idCedi = "Error";
+                isValid = false;
+            }
+            
+            // Validar ID Etiqueta
+            const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
+            if (!sIdEtiqueta || sIdEtiqueta.trim() === "") {
+                validationState.idEtiqueta = "Error";
+                isValid = false;
+            }
+            
+            // Validar Etiqueta
+            const sEtiqueta = oView.byId("inputEtiqueta").getValue();
+            if (!sEtiqueta || sEtiqueta.trim() === "") {
+                validationState.etiqueta = "Error";
+                isValid = false;
+            }
+            
+            // Actualizar estados visuales
+            oModel.setProperty("/validationState", validationState);
+            
+            return isValid;
+        },
+
+        // Limpiar estados de validación
+        _clearValidationStates: function() {
+            const oModel = this.getView().getModel();
+            oModel.setProperty("/validationState", {
+                idSociedad: "None",
+                idCedi: "None",
+                idEtiqueta: "None",
+                etiqueta: "None"
+            });
+        },
+
         onSaveNewCatalogo: function () {
-            // 1. Leer todos los valores del formulario del fragmento
+            // 1. Validar campos requeridos PRIMERO
+            if (!this._validateRequiredFields()) {
+                MessageBox.error(
+                    "Por favor, complete todos los campos marcados como obligatorios.",
+                    {
+                        title: "Campos Incompletos"
+                    }
+                );
+                return;
+            }
+            
+            // 2. Leer todos los valores del formulario del fragmento
             const oView = this.getView();
             const sSociedad = oView.byId("inputIdSociedad").getValue();
             const sCedi = oView.byId("inputIdCedi").getValue();
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
 
-            // 2. Leer los Tokens del MultiInput
+            // 3. Leer los Tokens del MultiInput
             const oMultiInput = oView.byId("fragmentInputIndice");
             const aTokens = oMultiInput.getTokens();
-
-            // 3. Validar campos requeridos
-            if (!sSociedad || !sCedi || !sIdEtiqueta || !sEtiqueta) {
-                MessageBox.error("Por favor, complete todos los campos requeridos.");
-                return;
-            }
 
             // --- PASO 4: Preparar datos para el MODELO LOCAL y la API ---
 
             // Para el MODELO LOCAL (la tabla):
-            // El MultiInput de tu tabla espera un array de objetos: [{key: "...", text: "..."}]
             const aIndiceAsObjects = aTokens.map(oToken => ({
                 key: oToken.getKey(),
                 text: oToken.getText()
             }));
 
             // Para la API (el payload):
-            // Tu API parece esperar un string separado por comas
             const sIndiceForAPI = aTokens.map(oToken => oToken.getKey()).join(',');
 
             // 5. Construir el objeto de datos para el MODELO LOCAL (minúsculas)
-            // Este objeto se insertará en la tabla visualmente
             const newData = {
                 idsociedad: sSociedad,
                 idcedi: sCedi,
                 idetiqueta: sIdEtiqueta,
                 etiqueta: sEtiqueta,
-                indice: aIndiceAsObjects, // El array de objetos para el binding
+                indice: aIndiceAsObjects,
                 coleccion: oView.byId("inputColeccion").getValue(),
                 seccion: oView.byId("inputSeccion").getValue(),
                 secuencia: parseInt(oView.byId("inputSecuencia").getValue() || "0", 10),
                 imagen: oView.byId("inputImagen").getValue(),
                 ruta: oView.byId("inputRuta").getValue(),
                 descripcion: oView.byId("textAreaDescripcion").getValue(),
-                parent: true, // Es un catálogo padre
-                
-                // ¡IMPORTANTE! Marcamos la fila con un estado visual
-                // Usará el color "Success" (verde) para indicar que es nuevo
+                parent: true,
                 uiState: "Success" 
             };
 
-            // 6. Construir el PAYLOAD para la API (MAYÚSCULAS, según tu spec)
+            // 6. Construir el PAYLOAD para la API
             const apiPayload = {
                 IDSOCIEDAD: newData.idsociedad,
                 IDCEDI: newData.idcedi,
                 IDETIQUETA: newData.idetiqueta,
                 ETIQUETA: newData.etiqueta,
-                INDICE: sIndiceForAPI, // El string para la API
+                INDICE: sIndiceForAPI,
                 COLECCION: newData.coleccion,
                 SECCION: newData.seccion,
                 SECUENCIA: newData.secuencia,
                 IMAGEN: newData.imagen,
-                ROUTE: newData.ruta, // Tu API de update usa ROUTE, no ruta
+                ROUTE: newData.ruta,
                 DESCRIPCION: newData.descripcion
             };
 
-            // 7. Crear la operación (con el formato de tu API)
+            // 7. Crear la operación
             const operation = {
-                collection: "labels", // Como en tu API
+                collection: "labels",
                 action: "CREATE",
-                payload: apiPayload // Como en tu API
+                payload: apiPayload
             };
 
-            // 8. Añadir al servicio (esto NO guarda en BD, solo encola)
+            // 8. Añadir al servicio
             this._labelService.addOperation(operation);
 
-            // --- PASO 9: AÑADIR EL REGISTRO AL MODELO LOCAL (Esta es la magia) ---
+            // --- PASO 9: AÑADIR EL REGISTRO AL MODELO LOCAL ---
             const oModel = this.getView().getModel();
             const aLabels = oModel.getProperty("/labels");
 
             // Añadimos el nuevo registro al inicio del arreglo
             aLabels.unshift(newData); 
 
-            // Actualizamos el modelo. La tabla se refrescará automáticamente.
+            // Actualizamos el modelo
             oModel.setProperty("/labels", aLabels);
             
             // (Opcional) Actualizar contador total
             const oViewModel = this.getView().getModel("view");
-            oViewModel.setProperty("/totalRows", aLabels.length); // Simplificado, ajusta si es necesario
-
-            // --------------------------------------------------------------------
+            oViewModel.setProperty("/totalRows", aLabels.length);
 
             MessageToast.show("Catálogo agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
 
-            // 10. Usamos la función de cerrar (que ahora también limpia los campos)
+            // 10. Cerrar y limpiar
             this.onCloseNewCatalogo();
+        },
+
+        onCloseNewCatalogo: function() {
+            if (this._oNewCatalogoDialog) {
+                // Limpiar estados de validación
+                this._clearValidationStates();
+                
+                // Limpiar campos
+                const oView = this.getView();
+                oView.byId("inputIdSociedad").setValue("");
+                oView.byId("inputIdCedi").setValue("");
+                oView.byId("inputIdEtiqueta").setValue("");
+                oView.byId("inputEtiqueta").setValue("");
+                oView.byId("fragmentInputIndice").removeAllTokens();
+                oView.byId("inputColeccion").setValue("");
+                oView.byId("inputSeccion").setValue("");
+                oView.byId("inputSecuencia").setValue("");
+                oView.byId("inputImagen").setValue("");
+                oView.byId("inputRuta").setValue("");
+                oView.byId("textAreaDescripcion").setValue("");
+                
+                // Cerrar el diálogo
+                this._oNewCatalogoDialog.close();
+            }
         },
 
         onSaveNewValor: function (oEvent) {
