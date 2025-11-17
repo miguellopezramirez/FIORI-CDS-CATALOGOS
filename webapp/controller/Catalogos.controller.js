@@ -542,31 +542,26 @@ sap.ui.define([
             // 10. Cerrar y limpiar
             this.onCloseNewCatalogo();
         },
-
-        onCloseNewCatalogo: function() {
-            if (this._oNewCatalogoDialog) {
-                // Limpiar estados de validación
-                this._clearValidationStates();
-                
-                // Limpiar campos
-                const oView = this.getView();
-                oView.byId("inputIdSociedad").setValue("");
-                oView.byId("inputIdCedi").setValue("");
-                oView.byId("inputIdEtiqueta").setValue("");
-                oView.byId("inputEtiqueta").setValue("");
-                oView.byId("fragmentInputIndice").removeAllTokens();
-                oView.byId("inputColeccion").setValue("");
-                oView.byId("inputSeccion").setValue("");
-                oView.byId("inputSecuencia").setValue("");
-                oView.byId("inputImagen").setValue("");
-                oView.byId("inputRuta").setValue("");
-                oView.byId("textAreaDescripcion").setValue("");
-                
-                // Cerrar el diálogo
-                this._oNewCatalogoDialog.close();
+        
+        onCloseNewCatalogo: function () {
+            // --- Limpiamos los campos ---
+            this.byId("inputIdSociedad")?.setValue("");
+            this.byId("inputIdCedi")?.setValue("");
+            this.byId("inputIdEtiqueta")?.setValue("");
+            this.byId("inputEtiqueta")?.setValue("");
+            this.byId("fragmentInputIndice")?.setTokens([]); // Limpiamos el MultiInput
+            this.byId("inputColeccion")?.setValue("");
+            this.byId("inputSeccion")?.setValue("");
+            this.byId("inputSecuencia")?.setValue("0");
+            this.byId("inputImagen")?.setValue("");
+            this.byId("inputRuta")?.setValue("");
+            this.byId("textAreaDescripcion")?.setValue("");
+            if (this._pNewCatalogoDialog) {
+                this._pNewCatalogoDialog.then(function (oDialog) {
+                    oDialog.close();
+                });
             }
         },
-
         onSaveNewValor: function (oEvent) {
             const oDialog = oEvent.getSource().getParent();
             if (!oDialog) {
