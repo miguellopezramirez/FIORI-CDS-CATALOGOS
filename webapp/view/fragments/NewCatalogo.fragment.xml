@@ -30,10 +30,10 @@
                 <form:content>
 
                     <Label text="ID Sociedad" required="true" />
-                    <Input id="inputIdSociedad" placeholder="Ej: 1000" />
+                    <Input id="inputIdSociedad" type="Number" placeholder="1000" />
 
                     <Label text="ID CEDI" required="true" />
-                    <Input id="inputIdCedi" placeholder="Ej: 1" />
+                    <Input id="inputIdCedi" type="Number" placeholder="1" />
 
                     <Label text="ID Etiqueta" required="true" />
                     <Input id="inputIdEtiqueta" placeholder="Ej: TIPO_PRODUCTO" />
