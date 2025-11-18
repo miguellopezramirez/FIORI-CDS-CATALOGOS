@@ -26,7 +26,38 @@
                     <Input id="valInputValor" placeholder="Ej: Color Rojo"/>
 
                     <Label text="Valor Padre"/>
-                    <Input id="valInputIdValorPa" placeholder="Ej: COLORES"/>
+                    <HBox 
+                        width="100%" 
+                        alignItems="Center" 
+                        justifyContent="SpaceBetween">
+                        <ComboBox
+                            id="valComboBoxIdValorPa"
+                            width="100%"
+                            placeholder="Buscar o seleccionar valor padre..."
+                            selectionChange=".onValorPadreComboChange"
+                            showSecondaryValues="true"
+                            items="{valueHelp>/flatItems}">
+                            <core:ListItem 
+                                key="{valueHelp>idvalor}" 
+                                text="{valueHelp>valor}"
+                                additionalText="{valueHelp>etiqueta}"/>
+                            <layoutData>
+                                <FlexItemData growFactor="1" />
+                            </layoutData>
+                        </ComboBox>
+                        <Button
+                            icon="sap-icon://value-help"
+                            type="Transparent"
+                            press=".onOpenValorPadreDialog"
+                            tooltip="Abrir ayuda de valor"/>
+                        <Button
+                            id="valClearButton"
+                            icon="sap-icon://decline"
+                            type="Transparent"
+                            visible="false"
+                            press=".onClearValorPadre"
+                            tooltip="Limpiar selección"/>
+                    </HBox>
                     
                     <Label text="Secuencia"/>
                     <Input id="valInputSecuencia" type="Number" placeholder="0"/>

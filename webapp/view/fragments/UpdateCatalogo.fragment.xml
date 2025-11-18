@@ -58,11 +58,40 @@
                     
                     <Label text="Valor Padre"
                            visible="{= ${update>/parent} === false }"/>
-                    <Input id="updateInputIdValorPa" 
-                           placeholder="Ej: COLORES (Opcional)" 
-                           value= "{update>/idvalorpa}"
-                           visible="{= ${update>/parent} === false }"/>
-
+                    <HBox 
+                        width="100%" 
+                        alignItems="Center" 
+                        justifyContent="SpaceBetween"
+                        visible="{= ${update>/parent} === false }">
+                        <ComboBox
+                            id="valComboBoxIdValorPa"
+                            width="100%"
+                            placeholder="Buscar o seleccionar valor padre..."
+                            selectionChange=".onValorPadreComboChange"
+                            showSecondaryValues="true"
+                            selectedKey="{update>/idvalorpa}"
+                            items="{valueHelp>/flatItems}">
+                            <core:ListItem 
+                                key="{valueHelp>idvalor}"
+                                text="{valueHelp>valor}"
+                                additionalText="{valueHelp>etiqueta}"/>
+                            <layoutData>
+                                <FlexItemData growFactor="1" />
+                            </layoutData>
+                        </ComboBox>
+                        <Button
+                            icon="sap-icon://value-help"
+                            type="Transparent"
+                            press=".onOpenValorPadreDialog"
+                            tooltip="Abrir ayuda de valor"/>
+                        <Button
+                            id="valClearButton"
+                            icon="sap-icon://decline"
+                            type="Transparent"
+                            visible="false"
+                            press=".onClearValorPadre"
+                            tooltip="Limpiar selección"/>
+                    </HBox>
 
                     <Label text="Secuencia"/>
                     <Input id="updateInputSecuencia" type="Number" placeholder="0" value= "{update>/secuencia}"/>

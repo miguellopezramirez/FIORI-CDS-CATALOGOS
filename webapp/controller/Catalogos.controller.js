@@ -4,8 +4,9 @@ sap.ui.define([
     "com/cat/sapfioricatalogs/service/labelService",
     "sap/m/MessageBox",
     "sap/m/MessageToast",
+    "sap/ui/core/Fragment",
     "sap/m/Token"
-], function (Controller, JSONModel, LabelService, MessageBox, MessageToast, Token) {
+], function (Controller, JSONModel, LabelService, MessageBox, MessageToast, Fragment, Token) {
     "use strict";
 
     return Controller.extend("com.cat.sapfioricatalogs.controller.Catalogos", {
@@ -163,41 +164,8 @@ sap.ui.define([
             });
         },
 
-        onNewValor: function () {
-            const oViewModel = this.getView().getModel("view");
-            const oSelectedObject = oViewModel.getProperty("/selectedLabel");
 
-            if (!oSelectedObject) {
-                MessageBox.error("Por favor, seleccione un catálogo (fila padre) primero.");
-                return;
-            }
-
-            if (oSelectedObject.parent !== true) {
-                MessageBox.error("Solo puede agregar valores a un catálogo (fila padre).");
-                return;
-            }
-
-            if (!this._pNewValorDialog) {
-                this._pNewValorDialog = this.loadFragment({
-                    name: "com.cat.sapfioricatalogs.view.fragments.NewValor"
-                }).then((oDialog) => {
-                    this.getView().addDependent(oDialog);
-                    return oDialog;
-                });
-            }
-
-            this._pNewValorDialog.then((oDialog) => {
-                const oValorModel = new JSONModel({
-                    parentKey: oSelectedObject.idetiqueta,
-                    idsociedad: oSelectedObject.idsociedad,
-                    idcedi: oSelectedObject.idcedi
-                });
-                oDialog.setModel(oValorModel, "newValor");
-                this._clearNewValorForm();
-                oDialog.open();
-            });
-        },
-
+        
         onUpdate: function () {
             const oTable = this.byId("treeTable");
             const aSelectedIndices = oTable.getSelectedIndices();
@@ -222,7 +190,17 @@ sap.ui.define([
             this._pUpdateDialog.then((oDialog) => {
                 oDialog.setModel(new JSONModel(oUpdateData), "update");
                 oDialog.open();
+
+                // Preparar datos para el Value Help
+                const oModel = this.getView().getModel();
+                const aLabels = oModel.getProperty("/labels");
+                const oValueHelpData = this._prepareValueHelpData(aLabels);
+                
+                const oValueHelpModel = new JSONModel(oValueHelpData);
+                oDialog.setModel(oValueHelpModel, "valueHelp");
             });
+            
+            
         },
 
         onDelete: function () {
@@ -294,6 +272,433 @@ sap.ui.define([
     this._labelService.addOperation(operation);
 },
 
+
+        // Nuevo manejador para el evento change
+        onValorPadreChange: function(oEvent) {
+            const sValue = oEvent.getParameter("value");
+            const oSelectedItem = oEvent.getParameter("selectedItem");
+            
+            // Obtener el modelo del diálogo
+            const oDialog = oEvent.getSource().getParent().getParent().getParent();
+            const oValorModel = oDialog.getModel("newValor");
+            
+            // Actualizar el valor en el modelo
+            oValorModel.setProperty("/idvalorpa", sValue);
+            
+            console.log("Valor padre seleccionado:", sValue, oSelectedItem);
+        },
+
+
+        _prepareValueHelpData: function(aLabels) {
+            const aFlatItems = [];
+            const aGroupedItems = [];
+            
+            aLabels.forEach(oLabel => {
+                const aChildren = oLabel.children || oLabel.subRows || [];
+                
+                if (aChildren.length > 0) {
+                    // Agregar header de grupo
+                    aGroupedItems.push({
+                        isGroup: true,
+                        etiqueta: oLabel.etiqueta,
+                        idetiqueta: oLabel.idetiqueta
+                    });
+                    
+                    // Agregar valores del grupo
+                    aChildren.forEach(oChild => {
+                        const oItem = {
+                            idvalor: oChild.idvalor,
+                            valor: oChild.valor,
+                            etiqueta: oLabel.etiqueta,
+                            idetiqueta: oLabel.idetiqueta,
+                            isGroup: false,
+                            selected: false
+                        };
+                        
+                        aFlatItems.push(oItem);
+                        aGroupedItems.push(oItem);
+                    });
+                }
+            });
+            
+            return {
+                flatItems: aFlatItems,
+                groupedItems: aGroupedItems
+            };
+        },
+
+        /**
+         * Abrir el diálogo de Nuevo Valor
+         */
+        onNewValor: function () {
+            const oViewModel = this.getView().getModel("view");
+            const oSelectedObject = oViewModel.getProperty("/selectedLabel");
+
+            if (!oSelectedObject) {
+                MessageBox.error("Por favor, seleccione un catálogo (fila padre) primero.");
+                return;
+            }
+
+            if (oSelectedObject.parent !== true) {
+                MessageBox.error("Solo puede agregar valores a un catálogo (fila padre).");
+                return;
+            }
+
+            if (!this._pNewValorDialog) {
+                this._pNewValorDialog = this.loadFragment({
+                    name: "com.cat.sapfioricatalogs.view.fragments.NewValor"
+                }).then((oDialog) => {
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
+                });
+            }
+
+            this._pNewValorDialog.then((oDialog) => {
+                // Preparar modelo para el diálogo
+                const oValorModel = new JSONModel({
+                    parentKey: oSelectedObject.idetiqueta,
+                    idsociedad: oSelectedObject.idsociedad,
+                    idcedi: oSelectedObject.idcedi,
+                    idvalorpa: null,
+                    idvalorpaDisplay: ""
+                });
+                oDialog.setModel(oValorModel, "newValor");
+                
+                // Preparar datos para el Value Help
+                const oModel = this.getView().getModel();
+                const aLabels = oModel.getProperty("/labels");
+                const oValueHelpData = this._prepareValueHelpData(aLabels);
+                
+                const oValueHelpModel = new JSONModel(oValueHelpData);
+                oDialog.setModel(oValueHelpModel, "valueHelp");
+                
+                this._clearNewValorForm();
+                oDialog.open();
+            });
+        },
+
+        /**
+         * Cuando se selecciona un valor del ComboBox
+         */
+        onValorPadreComboChange: function(oEvent) {
+            const oSelectedItem = oEvent.getParameter("selectedItem");
+            
+            if (oSelectedItem) {
+                const sIdValor = oSelectedItem.getKey();
+                
+                // Actualizar modelo
+                const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
+                const oValorModel = oDialog.getModel("newValor");
+                oValorModel.setProperty("/idvalorpa", sIdValor);
+                oValorModel.setProperty("/idvalorpaDisplay", oSelectedItem.getText());
+                
+                // Mostrar botón de limpiar
+                this.byId("valClearButton").setVisible(true);
+            }
+        },
+
+        /**
+         * Abrir el diálogo de Value Help completo
+         */
+        onOpenValorPadreDialog: function(oEvent) {
+            // Obtener el diálogo padre (NewValor)
+            const oParentDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
+            const oValueHelpModel = oParentDialog.getModel("valueHelp");
+            const oValorModel = oParentDialog.getModel("newValor");
+            const sCurrentValue = oValorModel.getProperty("/idvalorpa");
+            
+            // Marcar el valor actual como seleccionado
+            const aGroupedItems = oValueHelpModel.getProperty("/groupedItems");
+            aGroupedItems.forEach(item => {
+                if (!item.isGroup) {
+                    item.selected = (item.idvalor === sCurrentValue);
+                }
+            });
+            oValueHelpModel.setProperty("/groupedItems", aGroupedItems);
+            
+            if (!this._pValorPadreDialog) {
+                this._pValorPadreDialog = this.loadFragment({
+                    name: "com.cat.sapfioricatalogs.view.fragments.ValorPadreDialog"
+                }).then((oDialog) => {
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
+                });
+            }
+            
+            this._pValorPadreDialog.then((oDialog) => {
+                // Pasar el modelo al diálogo
+                oDialog.setModel(oValueHelpModel, "valueHelp");
+                
+                // Limpiar búsqueda
+                const oSearchField = Fragment.byId(this.getView().getId(), "valorPadreSearchField");
+                if (oSearchField) {
+                    oSearchField.setValue("");
+                }
+                
+                oDialog.open();
+            });
+        },
+
+        /**
+         * Buscar en el diálogo de Value Help
+         */
+        onSearchValorPadre: function(oEvent) {
+            const sQuery = oEvent.getParameter("newValue");
+            const oList = Fragment.byId(this.getView().getId(), "valorPadreList");
+            const oBinding = oList.getBinding("items");
+            
+            if (!oBinding) return;
+            
+            const aFilters = [];
+            if (sQuery) {
+                aFilters.push(new sap.ui.model.Filter({
+                    filters: [
+                        new sap.ui.model.Filter("valor", sap.ui.model.FilterOperator.Contains, sQuery),
+                        new sap.ui.model.Filter("etiqueta", sap.ui.model.FilterOperator.Contains, sQuery)
+                    ],
+                    and: false
+                }));
+            }
+            
+            oBinding.filter(aFilters);
+        },
+
+        onSelectValorPadreFromDialog: function(oEvent) {
+            const oSelectedItem = oEvent.getParameter("listItem");
+            
+            if (oSelectedItem) {
+                const oContext = oSelectedItem.getBindingContext("valueHelp");
+                const oData = oContext.getObject();
+
+                // Acceder a las propiedades
+                const sIdValor = oData.idvalor;
+                const sValor = oData.valor;
+                
+                // Buscar el diálogo de NewValor entre los dependents de la vista
+                const aDialogs = this.getView().getDependents();
+                let oParentDialog = null;
+                
+                for (let i = 0; i < aDialogs.length; i++) {
+                    if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
+                        aDialogs[i].getTitle() === "Nuevo Valor") {
+                        oParentDialog = aDialogs[i];
+                        break;
+                    }
+                }
+                
+                if (oParentDialog) {
+                    const oValorModel = oParentDialog.getModel("newValor");
+                    oValorModel.setProperty("/idvalorpa", sIdValor);
+                    oValorModel.setProperty("/idvalorpaDisplay", sValor);
+                    
+                    // Actualizar ComboBox
+                    const oComboBox = this.byId("valComboBoxIdValorPa");
+                    if (oComboBox) {
+                        oComboBox.setSelectedKey(sIdValor);
+                    }
+                    
+                    // Mostrar botón de limpiar
+                    const oClearButton = this.byId("valClearButton");
+                    if (oClearButton) {
+                        oClearButton.setVisible(true);
+                    }
+                }
+                
+                // Cerrar el diálogo de Value Help
+                this.onCloseValorPadreDialog();
+            }
+        },
+
+
+        /**
+         * Limpiar selección desde el diálogo
+         */
+        onClearValorPadreFromDialog: function() {
+            const aDialogs = this.getView().getDependents();
+        let oParentDialog = null;
+
+        for (let i = 0; i < aDialogs.length; i++) {
+            if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
+                aDialogs[i].getTitle() === "Nuevo Valor") {
+                oParentDialog = aDialogs[i];
+                break;
+            }
+        }
+            
+            if (oParentDialog) {
+                const oValorModel = oParentDialog.getModel("newValor");
+                oValorModel.setProperty("/idvalorpa", null);
+                oValorModel.setProperty("/idvalorpaDisplay", "");
+                
+                // Actualizar ComboBox
+                const oComboBox = this.byId("valComboBoxIdValorPa");
+                if (oComboBox) {
+                    oComboBox.setSelectedKey("");
+                }
+                
+                // Ocultar botón de limpiar
+                this.byId("valClearButton").setVisible(false);
+            }
+            
+            this.onCloseValorPadreDialog();
+        },
+
+        /**
+         * Cerrar el diálogo de Value Help
+         */
+        onCloseValorPadreDialog: function() {
+            if (this._pValorPadreDialog) {
+                this._pValorPadreDialog.then((oDialog) => {
+                    oDialog.close();
+                });
+            }
+        },
+
+        /**
+         * Limpiar selección desde el botón externo
+         */
+        onClearValorPadre: function(oEvent) {
+            const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
+            const oValorModel = oDialog.getModel("newValor");
+            
+            oValorModel.setProperty("/idvalorpa", null);
+            oValorModel.setProperty("/idvalorpaDisplay", "");
+            
+            // Limpiar ComboBox
+            const oComboBox = this.byId("valComboBoxIdValorPa");
+            if (oComboBox) {
+                oComboBox.setSelectedKey("");
+            }
+            
+            // Ocultar botón de limpiar
+            oEvent.getSource().setVisible(false);
+        },
+
+        /**
+         * Modificar onSaveNewValor para usar el valor seleccionado
+         */
+        onSaveNewValor: function (oEvent) {
+            const oDialog = oEvent.getSource().getParent();
+            if (!oDialog) {
+                MessageBox.error("No se pudo encontrar el diálogo.");
+                return;
+            }
+
+            const oValorModel = oDialog.getModel("newValor");
+            const sParentKey = oValorModel.getProperty("/parentKey");
+            const sSociedad = oValorModel.getProperty("/idsociedad");
+            const sCedi = oValorModel.getProperty("/idcedi");
+            const sIdValorPa = oValorModel.getProperty("/idvalorpa"); // *** VALOR DEL VALUE HELP ***
+
+            const oView = this.getView();
+            const sIdValor = oView.byId("valInputIdValor").getValue();
+            const sValor = oView.byId("valInputValor").getValue();
+
+            const aErrors = [];
+            if (!sIdValor || sIdValor.trim() === "") {
+                aErrors.push("El campo 'ID Valor' es requerido.");
+            }
+            if (!sValor || sValor.trim() === "") {
+                aErrors.push("El campo 'Valor' es requerido.");
+            }
+            if (aErrors.length > 0) {
+                MessageBox.error(aErrors.join("\n"));
+                return; 
+            }
+
+            const newLocalData = {
+                idsociedad: sSociedad,
+                idcedi: sCedi,
+                idvalor: sIdValor,
+                valor: sValor,
+                idvalorpa: sIdValorPa || null, // *** USAR VALOR DEL VALUE HELP ***
+                secuencia: parseInt(oView.byId("valInputSecuencia").getValue() || "0", 10),
+                imagen: oView.byId("valInputImagen").getValue(),
+                ruta: oView.byId("valInputRuta").getValue(),
+                descripcion: oView.byId("valTextAreaDescripcion").getValue(),
+                parent: false, 
+                uiState: "Success" 
+            };
+
+            const apiPayload = {
+                IDSOCIEDAD: newLocalData.idsociedad,
+                IDCEDI: newLocalData.idcedi,
+                IDETIQUETA: sParentKey, 
+                IDVALOR: newLocalData.idvalor,
+                VALOR: newLocalData.valor,
+                IDVALORPA: newLocalData.idvalorpa || undefined, 
+                SECUENCIA: newLocalData.secuencia,
+                IMAGEN: newLocalData.imagen,
+                ROUTE: newLocalData.ruta, 
+                DESCRIPCION: newLocalData.descripcion
+            };
+
+            const operation = {
+                collection: "values", 
+                action: "CREATE",
+                payload: apiPayload 
+            };
+            
+            
+            this._labelService.addOperation(operation);
+
+            const dataModel = this.getView().getModel();
+                    const aLabels = dataModel.getProperty("/labels");
+                
+                    const aUpdatedLabels = aLabels.map(label => {
+                    if (label.idetiqueta === sParentKey) {
+                // Encontramos el padre
+                const aChildren = label.children || [];
+                return {
+                    ...label,
+                    children: [...aChildren, newLocalData]  // Agregar el nuevo valor
+                };
+            }
+            return label;  
+        });
+            dataModel.setProperty("/labels", aUpdatedLabels);
+            const oTable = this.byId("treeTable");
+            if (oTable) {
+                const iParentIndex = aLabels.findIndex(label => label.idetiqueta === sParentKey);
+                if (iParentIndex >= 0 && !oTable.isExpanded(iParentIndex)) {
+                    oTable.expand(iParentIndex);  // Mostrar el nuevo valor inmediatamente
+                }
+            }
+            let iTotalRows = 0;
+            aUpdatedLabels.forEach(parent => {
+                iTotalRows++; // Contar el padre
+                if (parent.children) {
+                    iTotalRows += parent.children.length; // Contar los hijos
+                }
+            });
+            dataModel.setProperty("/totalRows", iTotalRows);
+
+            // Mostrar mensaje de éxito
+            MessageToast.show("Valor agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
+            this.onCloseNewValor();
+        },
+
+        /**
+         * Modificar _clearNewValorForm para limpiar también el Value Help
+         */
+        _clearNewValorForm: function() {
+            this.byId("valInputIdValor")?.setValue("");
+            this.byId("valInputValor")?.setValue("");
+            this.byId("valComboBoxIdValorPa")?.setSelectedKey(""); // *** LIMPIAR COMBOBOX ***
+            this.byId("valClearButton")?.setVisible(false); // *** OCULTAR BOTÓN ***
+            this.byId("valInputSecuencia")?.setValue("0");
+            this.byId("valInputImagen")?.setValue("");
+            this.byId("valInputRuta")?.setValue("");
+            this.byId("valTextAreaDescripcion")?.setValue("");
+        },
+
+        // Agregar al onExit para limpiar el diálogo
+        onExit: function () {
+            this._pNewCatalogoDialog = null;
+            this._pNewValorDialog = null;
+            this._pUpdateDialog = null;
+            this._pValorPadreDialog = null; // *** NUEVO ***
+        },
         onSaveChanges: function () {
             const viewModel = this.getView().getModel("view");
             viewModel.setProperty("/busy", true);
@@ -542,7 +947,7 @@ sap.ui.define([
             // 10. Cerrar y limpiar
             this.onCloseNewCatalogo();
         },
-        
+
         onCloseNewCatalogo: function () {
             // --- Limpiamos los campos ---
             this.byId("inputIdSociedad")?.setValue("");
@@ -562,107 +967,7 @@ sap.ui.define([
                 });
             }
         },
-        onSaveNewValor: function (oEvent) {
-            const oDialog = oEvent.getSource().getParent();
-            if (!oDialog) {
-                MessageBox.error("No se pudo encontrar el diálogo.");
-                return;
-            }
-
-            const oValorModel = oDialog.getModel("newValor");
-            const sParentKey = oValorModel.getProperty("/parentKey");
-            const sSociedad = oValorModel.getProperty("/idsociedad");
-            const sCedi = oValorModel.getProperty("/idcedi");
-
-            const oView = this.getView();
-            const sIdValor = oView.byId("valInputIdValor").getValue();
-            const sValor = oView.byId("valInputValor").getValue();
-
-            const aErrors = [];
-            if (!sIdValor || sIdValor.trim() === "") {
-                aErrors.push("El campo 'ID Valor' es requerido.");
-            }
-            if (!sValor || sValor.trim() === "") {
-                aErrors.push("El campo 'Valor' es requerido.");
-            }
-            if (aErrors.length > 0) {
-                MessageBox.error(aErrors.join("\n"));
-                return; 
-            }
-
-            const newLocalData = {
-                idsociedad: sSociedad,
-                idcedi: sCedi,
-                idvalor: sIdValor,
-                valor: sValor,
-                idvalorpa: oView.byId("valInputIdValorPa").getValue() || null,
-                secuencia: parseInt(oView.byId("valInputSecuencia").getValue() || "0", 10),
-                imagen: oView.byId("valInputImagen").getValue(),
-                ruta: oView.byId("valInputRuta").getValue(),
-                descripcion: oView.byId("valTextAreaDescripcion").getValue(),
-                parent: false, 
-                uiState: "Success" 
-            };
-
-            const apiPayload = {
-                IDSOCIEDAD: newLocalData.idsociedad,
-                IDCEDI: newLocalData.idcedi,
-                IDETIQUETA: sParentKey, 
-                IDVALOR: newLocalData.idvalor,
-                VALOR: newLocalData.valor,
-                IDVALORPA: newLocalData.idvalorpa || undefined, 
-                SECUENCIA: newLocalData.secuencia,
-                IMAGEN: newLocalData.imagen,
-                ROUTE: newLocalData.ruta, 
-                DESCRIPCION: newLocalData.descripcion
-            };
-
-            const operation = {
-                collection: "values", 
-                action: "CREATE",
-                payload: apiPayload 
-            };
-
-            this._labelService.addOperation(operation);
-            const oModel = this.getView().getModel();
-            const aLabels = oModel.getProperty("/labels");
-
-            let sParentPath = "";
-            let iParentIndex = -1;
-            for (let i = 0; i < aLabels.length; i++) {
-                if (aLabels[i].idetiqueta === sParentKey) {
-                    sParentPath = "/labels/" + i;
-                    iParentIndex = i;
-                    break;
-                }
-            }
-
-            if (sParentPath) {
-                const sChildrenPath = sParentPath + "/children";
-                let aChildren = oModel.getProperty(sChildrenPath);
-                if (!aChildren || !Array.isArray(aChildren)) {
-                    aChildren = [];
-                }
-
-                aChildren.push(newLocalData); 
-
-                oModel.setProperty(sChildrenPath, aChildren);
-                
-                const oTable = this.byId("treeTable");
-                if (iParentIndex > -1 && !oTable.isExpanded(iParentIndex)) {
-                    oTable.expand(iParentIndex);
-                }
-                
-            } else {
-                console.error("No se encontró el catálogo padre '" + sParentKey + "' en el modelo local.");
-                MessageBox.error("Error: No se pudo encontrar el catálogo padre para añadir el valor.");
-                return;
-            }
-
-            MessageToast.show("Valor agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
-
-            this.onCloseNewValor();
-        },
+        
 
         onSaveUpdate: function (oEvent) {
             const oDialog = oEvent?.getSource()?.getParent?.() || this._updateDialog;
@@ -805,31 +1110,8 @@ sap.ui.define([
             oBinding.filter(aFilters);
         },
 
-        /**
-         * Se llama cuando la vista es destruida.
-         * Limpiamos las promesas de los diálogos.
-         * Los diálogos en sí se destruirán automáticamente 
-         * porque usamos addDependent().
-         */
-        onExit: function () {
-            this._pNewCatalogoDialog = null;
-            this._pNewValorDialog = null;
-            this._pUpdateDialog = null;
-        },
+        
 
-        /**
-         * Limpia los campos del formulario de Nuevo Valor.
-         */
-        _clearNewValorForm: function() {
-            // Usamos los IDs del NewValor.fragment.xml
-            this.byId("valInputIdValor")?.setValue("");
-            this.byId("valInputValor")?.setValue("");
-            this.byId("valInputIdValorPa")?.setValue("");
-            this.byId("valInputSecuencia")?.setValue("0");
-            this.byId("valInputImagen")?.setValue("");
-            this.byId("valInputRuta")?.setValue("");
-            this.byId("valTextAreaDescripcion")?.setValue("");
-        },
 
     });
 });
