@@ -29,21 +29,23 @@
 
                 <form:content>
 
-                    <Label text="ID Sociedad" required="true" />
-                    <Input 
+                    <Label text="ID Sociedad" />
+                    <ComboBox 
                         id="inputIdSociedad" 
-                        type="Number" 
-                        placeholder="1000"
-                        valueState="{/validationState/idSociedad}"
-                        valueStateText="Este campo es obligatorio" />
+                        placeholder="Seleccione Sociedad"
+                        items="{catalogs>/sociedades}"
+                        selectionChange=".onSociedadChange">
+                        <core:Item key="{catalogs>idvalor}" text="{catalogs>valor} ({catalogs>idvalor})" />
+                    </ComboBox>
 
-                    <Label text="ID CEDI" required="true" />
-                    <Input 
+                    <Label text="ID CEDI" />
+                    <ComboBox 
                         id="inputIdCedi" 
-                        type="Number" 
-                        placeholder="1"
-                        valueState="{/validationState/idCedi}"
-                        valueStateText="Este campo es obligatorio" />
+                        placeholder="Seleccione CEDI"
+                        items="{catalogs>/cedis}"
+                        enabled="{catalogs>/cedisEnabled}">
+                         <core:Item key="{catalogs>idvalor}" text="{catalogs>valor} ({catalogs>idvalor})" />
+                    </ComboBox>
 
                     <Label text="ID Etiqueta" required="true" />
                     <Input 

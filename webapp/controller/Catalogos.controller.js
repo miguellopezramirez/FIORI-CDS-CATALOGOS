@@ -12,7 +12,6 @@ sap.ui.define([
     return Controller.extend("com.cat.sapfioricatalogs.controller.Catalogos", {
 
         onInit: function () {
-            // Inicializar el modelo de vista
             const viewModel = new JSONModel({
                 selectedLabel: null,
                 saveMessage: "",
@@ -22,30 +21,20 @@ sap.ui.define([
             });
             this.getView().setModel(viewModel, "view");
 
-            // Inicializar el modelo de datos
             const dataModel = new JSONModel({
                 labels: []
             });
             this.getView().setModel(dataModel);
 
-            //Obtener el modelo 'config' global
             var oConfigModel = this.getOwnerComponent().getModel("config");
 
-            // Inicializar el servicio
             this._labelService = new LabelService();
-            this._labelService.setConfigModel(oConfigModel); // Inyectamos el modelo
+            this._labelService.setConfigModel(oConfigModel); 
 
-            // Cargar los datos iniciales
             this._loadLabels();
 
-            // Suscribirse al evento de cambio de BD
             var oEventBus = this.getOwnerComponent().getEventBus();
-            oEventBus.subscribe(
-                "configChannel",  // El canal que definimos en Configuracion
-                "dbChanged",      // El evento que definimos en Configuracion
-                this._loadLabels, // La función a ejecutar (this._loadLabels)
-                this              // El contexto (importante para que 'this' funcione)
-            );
+            oEventBus.subscribe("configChannel", "dbChanged", this._loadLabels, this);
         },
 
         _loadLabels: function () {
@@ -56,6 +45,23 @@ sap.ui.define([
                 .then((data) => {
                     const dataModel = this.getView().getModel();
                     dataModel.setProperty("/labels", data);
+
+                    // --- LÓGICA MODIFICADA PARA COMBOS EN CASCADA ---
+                    const oSociedadLabel = data.find(d => d.idetiqueta === "SOCIEDAD");
+                    const aSociedades = oSociedadLabel ? oSociedadLabel.children : [];
+
+                    const oCediLabel = data.find(d => d.idetiqueta === "CEDI");
+                    const aCedis = oCediLabel ? oCediLabel.children : [];
+
+                    // Guardamos 'allCedis' como maestra y 'cedis' como la lista filtrada (inicialmente vacía)
+                    const oCatalogsModel = new JSONModel({
+                        sociedades: aSociedades,
+                        allCedis: aCedis, // Lista completa para filtrar después
+                        cedis: [],        // Lista que se mostrará en el combo (filtrada)
+                        cedisEnabled: false // Controla si el combo CEDI está habilitado
+                    });
+                    this.getView().setModel(oCatalogsModel, "catalogs");
+                    // -------------------------------------------------
 
                     let totalRows = data.length;
                     data.forEach(parent => {
@@ -75,59 +81,82 @@ sap.ui.define([
                 });
         },
 
-        onRowSelectionChange: function (oEvent) {
-            const oTable = this.byId("treeTable");
-            const viewModel = this.getView().getModel("view");
-
-            // Obtener el binding
-            const oBinding = oTable.getBinding("rows");
-            let aSelectedIndices = [];
-            if (oBinding) {
-                // Obtener la lista de todos los índices seleccionados
-                aSelectedIndices = oBinding.getSelectedIndices();
-            }
-
-            // Actualizar el conteo para el botón eliminar
-            viewModel.setProperty("/selectionCount", aSelectedIndices.length);
-
-            // Verificar el conteo para los botones "Modificar" y "Nuevo Valor"
-            if (aSelectedIndices.length === 1) {
-                // Si hay solo uno seleccionado
-                // Obtener el índice del arreglo
-                const iSelectedIndex = aSelectedIndices[0];
-
-                // Usamos ese índice para obtener el objeto
-                const oContext = oTable.getContextByIndex(iSelectedIndex);
-                const selectedRow = oContext.getObject();
-
-                // Establecemos el selectedLabel
-                viewModel.setProperty("/selectedLabel", selectedRow);
+        // --- NUEVA FUNCIÓN: Manejar cambio de sociedad (filtrado en cascada) ---
+        onSociedadChange: function(oEvent) {
+            const sSelectedSociedadKey = oEvent.getParameter("selectedKey");
+            this._filterCedis(sSelectedSociedadKey);
+            
+            // Limpiar la selección actual del CEDI al cambiar de sociedad
+            const sSourceId = oEvent.getSource().getId();
+            
+            // Detectar si es el diálogo de Nuevo o Modificar para limpiar el input correcto
+            if (sSourceId.includes("updateInputIdSociedad")) {
+                this.byId("updateInputIdCedi").setSelectedKey(null);
             } else {
-                // Si hay 0 o más de 1 seleccionados, limpiar el label.
-                viewModel.setProperty("/selectedLabel", null);
+                this.byId("inputIdCedi").setSelectedKey(null);
             }
         },
 
-        //Se dispara cuando el usuario agrega (Enter) o elimina un token del MultiInput.
-        onTokenUpdate: function (oEvent) {
-            const sType = oEvent.getParameter("type"); // "added" o "removed"
-            const oSource = oEvent.getSource(); // El MultiInput
+        // --- NUEVA FUNCIÓN HELPER: Filtrar CEDIs por VALOR PADRE ---
+// En Catalogos.controller.js
 
-            // Obtenemos el contexto (la fila) que se está editando
+        _filterCedis: function(sParentKey) {
+            const oCatalogsModel = this.getView().getModel("catalogs");
+            const aAllCedis = oCatalogsModel.getProperty("/allCedis");
+            
+            if (!sParentKey) {
+                oCatalogsModel.setProperty("/cedis", []);
+                oCatalogsModel.setProperty("/cedisEnabled", false);
+                return;
+            }
+
+            // CORRECCIÓN: Convertir ambos lados a String para asegurar que coincidan
+            // independientemente de si son números o textos.
+            const aFilteredCedis = aAllCedis.filter(cedi => 
+                String(cedi.idvalorpa) === String(sParentKey)
+            );
+            
+            console.log("Filtrando CEDIs para Sociedad:", sParentKey); // Para depurar
+            console.log("Encontrados:", aFilteredCedis.length);        // Para depurar
+
+            oCatalogsModel.setProperty("/cedis", aFilteredCedis);
+            oCatalogsModel.setProperty("/cedisEnabled", true);
+        },
+
+        // ... (onRowSelectionChange, onTokenUpdate, onNewCatalogo se mantienen igual) ...
+
+        onRowSelectionChange: function (oEvent) {
+            const oTable = this.byId("treeTable");
+            const viewModel = this.getView().getModel("view");
+            const oBinding = oTable.getBinding("rows");
+            let aSelectedIndices = [];
+            if (oBinding) {
+                aSelectedIndices = oBinding.getSelectedIndices();
+            }
+            viewModel.setProperty("/selectionCount", aSelectedIndices.length);
+
+            if (aSelectedIndices.length === 1) {
+                const iSelectedIndex = aSelectedIndices[0];
+                const oContext = oTable.getContextByIndex(iSelectedIndex);
+                const selectedRow = oContext.getObject();
+                viewModel.setProperty("/selectedLabel", selectedRow);
+            } else {
+                viewModel.setProperty("/selectedLabel", null);
+            }
+        },
+        
+        onTokenUpdate: function (oEvent) {
+            const sType = oEvent.getParameter("type");
+            const oSource = oEvent.getSource();
             const oBindingContext = oSource.getBindingContext();
             if (!oBindingContext) return;
-
-            const sBindingPath = oBindingContext.getPath(); // ej: "/labels/0" o "/labels/0/children/1"
+            const sBindingPath = oBindingContext.getPath();
             const oModel = this.getView().getModel();
-
-            // 1. Obtener el array actual de tokens del modelo
             let aTokens = oModel.getProperty(sBindingPath + "/indice") || [];
 
             if (sType === "added") {
-                // 2. Si se agregó un token, lo añadimos al array del modelo
                 const aAddedTokens = oEvent.getParameter("addedTokens");
                 aAddedTokens.forEach(function (oToken) {
-                    // Verificamos que no esté duplicado antes de añadir
                     if (!aTokens.find(t => t.key === oToken.getKey())) {
                         aTokens.push({
                             key: oToken.getKey(),
@@ -136,16 +165,12 @@ sap.ui.define([
                     }
                 });
             } else if (sType === "removed") {
-                // 3. Si se eliminó, lo quitamos del array del modelo
                 const aRemovedTokens = oEvent.getParameter("removedTokens");
                 const aRemovedKeys = aRemovedTokens.map(t => t.getKey());
-
                 aTokens = aTokens.filter(function (oToken) {
                     return !aRemovedKeys.includes(oToken.key);
                 });
             }
-
-            // 4. Actualizar el modelo con el nuevo array
             oModel.setProperty(sBindingPath + "/indice", aTokens);
         },
 
@@ -158,14 +183,19 @@ sap.ui.define([
                     return oDialog;
                 });
             }
+            
+            // Al abrir nuevo, limpiamos filtros
+            const oCatalogsModel = this.getView().getModel("catalogs");
+            if(oCatalogsModel){
+                oCatalogsModel.setProperty("/cedis", []);
+                oCatalogsModel.setProperty("/cedisEnabled", false);
+            }
 
             this._pNewCatalogoDialog.then(function (oDialog) {
                 oDialog.open();
             });
         },
 
-
-        
         onUpdate: function () {
             const oTable = this.byId("treeTable");
             const aSelectedIndices = oTable.getSelectedIndices();
@@ -177,6 +207,19 @@ sap.ui.define([
             const oContext = oTable.getContextByIndex(aSelectedIndices[0]);
             const oSelectedData = oContext.getObject();
             const oUpdateData = JSON.parse(JSON.stringify(oSelectedData));
+
+            // --- MODIFICADO: Precargar CEDIs basados en la sociedad actual ---
+            if (oUpdateData.idsociedad) {
+                this._filterCedis(oUpdateData.idsociedad);
+            } else {
+                 // Si no tiene sociedad, limpiar lista
+                 const oCatalogsModel = this.getView().getModel("catalogs");
+                 if(oCatalogsModel){
+                    oCatalogsModel.setProperty("/cedis", []);
+                    oCatalogsModel.setProperty("/cedisEnabled", false);
+                 }
+            }
+            // ---------------------------------------------------------------
 
             if (!this._pUpdateDialog) {
                 this._pUpdateDialog = this.loadFragment({
@@ -191,7 +234,6 @@ sap.ui.define([
                 oDialog.setModel(new JSONModel(oUpdateData), "update");
                 oDialog.open();
 
-                // Preparar datos para el Value Help
                 const oModel = this.getView().getModel();
                 const aLabels = oModel.getProperty("/labels");
                 const oValueHelpData = this._prepareValueHelpData(aLabels);
@@ -199,12 +241,11 @@ sap.ui.define([
                 const oValueHelpModel = new JSONModel(oValueHelpData);
                 oDialog.setModel(oValueHelpModel, "valueHelp");
             });
-            
-            
         },
 
-        onDelete: function () {
-            const oTable = this.byId("treeTable");
+        // ... (onDelete, _deleteRecord, onValorPadreChange se mantienen igual) ...
+         onDelete: function () {
+             const oTable = this.byId("treeTable");
             const aSelectedIndices = oTable.getSelectedIndices();
 
             if (aSelectedIndices.length === 0) {
@@ -212,7 +253,6 @@ sap.ui.define([
                 return;
             }
 
-            // Mapear índices a contextos para no perder referencia si la tabla cambia
             const aContexts = aSelectedIndices.map(iIndex => oTable.getContextByIndex(iIndex));
 
             MessageBox.confirm(
@@ -222,30 +262,16 @@ sap.ui.define([
                     onClose: (oAction) => {
                         if (oAction === MessageBox.Action.OK) {
                             const oModel = this.getView().getModel();
-
-                            // Iterar sobre los registros seleccionados
                             aContexts.forEach(oContext => {
                                 if (!oContext) return;
-
                                 const oRecord = oContext.getObject();
                                 const sPath = oContext.getPath();
-
-                                // 1. Encolar operación para el Backend (ADAPTADO A TU SERVICIO)
                                 this._deleteRecord(oRecord);
-
-                                // 2. Soft Delete Visual (Frontend)
-                                // Marcamos la fila en rojo usando la propiedad 'uiState'
                                 oModel.setProperty(sPath + "/uiState", "Error"); 
-                                
-                                // Opcional: Marcar estado de cambio
-                                // oRecord.status = "Deleted"; 
                             });
-
-                            // Limpiar selección y contadores
                             oTable.clearSelection();
                             this.getView().getModel("view").setProperty("/selectionCount", 0);
                             this.getView().getModel("view").setProperty("/selectedLabel", null);
-
                             MessageToast.show("Registros marcados para eliminar. Presione 'Guardar Cambios' para confirmar.");
                         }
                     }
@@ -254,57 +280,40 @@ sap.ui.define([
         },
 
         _deleteRecord: function (record) {
-    // Tu backend espera: collection ("labels" o "values")
-    const sCollection = record.parent ? "labels" : "values";
-    
-    // Tu backend espera el ID dentro de 'payload'
-    const sId = record.parent ? record.idetiqueta : record.idvalor;
+            const sCollection = record.parent ? "labels" : "values";
+            const sId = record.parent ? record.idetiqueta : record.idvalor;
 
-    const operation = {
-        collection: sCollection, 
-        action: "DELETE",
-        payload: {
-            id: sId
-        }
-    };
-
-    console.log("Encolando DELETE para backend:", operation);
-    this._labelService.addOperation(operation);
-},
-
-
-        // Nuevo manejador para el evento change
-        onValorPadreChange: function(oEvent) {
-            const sValue = oEvent.getParameter("value");
-            const oSelectedItem = oEvent.getParameter("selectedItem");
-            
-            // Obtener el modelo del diálogo
-            const oDialog = oEvent.getSource().getParent().getParent().getParent();
-            const oValorModel = oDialog.getModel("newValor");
-            
-            // Actualizar el valor en el modelo
-            oValorModel.setProperty("/idvalorpa", sValue);
-            
-            console.log("Valor padre seleccionado:", sValue, oSelectedItem);
+            const operation = {
+                collection: sCollection, 
+                action: "DELETE",
+                payload: {
+                    id: sId
+                }
+            };
+            this._labelService.addOperation(operation);
         },
 
+        onValorPadreChange: function(oEvent) {
+             const sValue = oEvent.getParameter("value");
+            const oSelectedItem = oEvent.getParameter("selectedItem");
+            const oDialog = oEvent.getSource().getParent().getParent().getParent();
+            const oValorModel = oDialog.getModel("newValor");
+            oValorModel.setProperty("/idvalorpa", sValue);
+        },
+
+        // ... (_prepareValueHelpData, onNewValor, onValorPadreComboChange etc. igual) ...
 
         _prepareValueHelpData: function(aLabels) {
             const aFlatItems = [];
             const aGroupedItems = [];
-            
             aLabels.forEach(oLabel => {
                 const aChildren = oLabel.children || oLabel.subRows || [];
-                
                 if (aChildren.length > 0) {
-                    // Agregar header de grupo
                     aGroupedItems.push({
                         isGroup: true,
                         etiqueta: oLabel.etiqueta,
                         idetiqueta: oLabel.idetiqueta
                     });
-                    
-                    // Agregar valores del grupo
                     aChildren.forEach(oChild => {
                         const oItem = {
                             idvalor: oChild.idvalor,
@@ -314,36 +323,29 @@ sap.ui.define([
                             isGroup: false,
                             selected: false
                         };
-                        
                         aFlatItems.push(oItem);
                         aGroupedItems.push(oItem);
                     });
                 }
             });
-            
             return {
                 flatItems: aFlatItems,
                 groupedItems: aGroupedItems
             };
         },
 
-        /**
-         * Abrir el diálogo de Nuevo Valor
-         */
         onNewValor: function () {
-            const oViewModel = this.getView().getModel("view");
+             const oViewModel = this.getView().getModel("view");
             const oSelectedObject = oViewModel.getProperty("/selectedLabel");
 
             if (!oSelectedObject) {
                 MessageBox.error("Por favor, seleccione un catálogo (fila padre) primero.");
                 return;
             }
-
             if (oSelectedObject.parent !== true) {
                 MessageBox.error("Solo puede agregar valores a un catálogo (fila padre).");
                 return;
             }
-
             if (!this._pNewValorDialog) {
                 this._pNewValorDialog = this.loadFragment({
                     name: "com.cat.sapfioricatalogs.view.fragments.NewValor"
@@ -352,9 +354,7 @@ sap.ui.define([
                     return oDialog;
                 });
             }
-
             this._pNewValorDialog.then((oDialog) => {
-                // Preparar modelo para el diálogo
                 const oValorModel = new JSONModel({
                     parentKey: oSelectedObject.idetiqueta,
                     idsociedad: oSelectedObject.idsociedad,
@@ -363,51 +363,33 @@ sap.ui.define([
                     idvalorpaDisplay: ""
                 });
                 oDialog.setModel(oValorModel, "newValor");
-                
-                // Preparar datos para el Value Help
                 const oModel = this.getView().getModel();
                 const aLabels = oModel.getProperty("/labels");
                 const oValueHelpData = this._prepareValueHelpData(aLabels);
-                
                 const oValueHelpModel = new JSONModel(oValueHelpData);
                 oDialog.setModel(oValueHelpModel, "valueHelp");
-                
                 this._clearNewValorForm();
                 oDialog.open();
             });
         },
 
-        /**
-         * Cuando se selecciona un valor del ComboBox
-         */
         onValorPadreComboChange: function(oEvent) {
-            const oSelectedItem = oEvent.getParameter("selectedItem");
-            
+             const oSelectedItem = oEvent.getParameter("selectedItem");
             if (oSelectedItem) {
                 const sIdValor = oSelectedItem.getKey();
-                
-                // Actualizar modelo
                 const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
                 const oValorModel = oDialog.getModel("newValor");
                 oValorModel.setProperty("/idvalorpa", sIdValor);
                 oValorModel.setProperty("/idvalorpaDisplay", oSelectedItem.getText());
-                
-                // Mostrar botón de limpiar
                 this.byId("valClearButton").setVisible(true);
             }
         },
-
-        /**
-         * Abrir el diálogo de Value Help completo
-         */
+        
         onOpenValorPadreDialog: function(oEvent) {
-            // Obtener el diálogo padre (NewValor)
             const oParentDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
             const oValueHelpModel = oParentDialog.getModel("valueHelp");
             const oValorModel = oParentDialog.getModel("newValor");
             const sCurrentValue = oValorModel.getProperty("/idvalorpa");
-            
-            // Marcar el valor actual como seleccionado
             const aGroupedItems = oValueHelpModel.getProperty("/groupedItems");
             aGroupedItems.forEach(item => {
                 if (!item.isGroup) {
@@ -424,26 +406,18 @@ sap.ui.define([
                     return oDialog;
                 });
             }
-            
             this._pValorPadreDialog.then((oDialog) => {
-                // Pasar el modelo al diálogo
                 oDialog.setModel(oValueHelpModel, "valueHelp");
-                
-                // Limpiar búsqueda
                 const oSearchField = Fragment.byId(this.getView().getId(), "valorPadreSearchField");
                 if (oSearchField) {
                     oSearchField.setValue("");
                 }
-                
                 oDialog.open();
             });
         },
 
-        /**
-         * Buscar en el diálogo de Value Help
-         */
         onSearchValorPadre: function(oEvent) {
-            const sQuery = oEvent.getParameter("newValue");
+             const sQuery = oEvent.getParameter("newValue");
             const oList = Fragment.byId(this.getView().getId(), "valorPadreList");
             const oBinding = oList.getBinding("items");
             
@@ -459,25 +433,19 @@ sap.ui.define([
                     and: false
                 }));
             }
-            
             oBinding.filter(aFilters);
         },
 
         onSelectValorPadreFromDialog: function(oEvent) {
-            const oSelectedItem = oEvent.getParameter("listItem");
-            
+             const oSelectedItem = oEvent.getParameter("listItem");
             if (oSelectedItem) {
                 const oContext = oSelectedItem.getBindingContext("valueHelp");
                 const oData = oContext.getObject();
-
-                // Acceder a las propiedades
                 const sIdValor = oData.idvalor;
                 const sValor = oData.valor;
                 
-                // Buscar el diálogo de NewValor entre los dependents de la vista
                 const aDialogs = this.getView().getDependents();
                 let oParentDialog = null;
-                
                 for (let i = 0; i < aDialogs.length; i++) {
                     if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
                         aDialogs[i].getTitle() === "Nuevo Valor") {
@@ -485,100 +453,69 @@ sap.ui.define([
                         break;
                     }
                 }
-                
                 if (oParentDialog) {
                     const oValorModel = oParentDialog.getModel("newValor");
                     oValorModel.setProperty("/idvalorpa", sIdValor);
                     oValorModel.setProperty("/idvalorpaDisplay", sValor);
-                    
-                    // Actualizar ComboBox
                     const oComboBox = this.byId("valComboBoxIdValorPa");
                     if (oComboBox) {
                         oComboBox.setSelectedKey(sIdValor);
                     }
-                    
-                    // Mostrar botón de limpiar
                     const oClearButton = this.byId("valClearButton");
                     if (oClearButton) {
                         oClearButton.setVisible(true);
                     }
                 }
-                
-                // Cerrar el diálogo de Value Help
                 this.onCloseValorPadreDialog();
             }
         },
 
-
-        /**
-         * Limpiar selección desde el diálogo
-         */
         onClearValorPadreFromDialog: function() {
-            const aDialogs = this.getView().getDependents();
-        let oParentDialog = null;
-
-        for (let i = 0; i < aDialogs.length; i++) {
-            if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
-                aDialogs[i].getTitle() === "Nuevo Valor") {
-                oParentDialog = aDialogs[i];
-                break;
+             const aDialogs = this.getView().getDependents();
+            let oParentDialog = null;
+    
+            for (let i = 0; i < aDialogs.length; i++) {
+                if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
+                    aDialogs[i].getTitle() === "Nuevo Valor") {
+                    oParentDialog = aDialogs[i];
+                    break;
+                }
             }
-        }
-            
             if (oParentDialog) {
                 const oValorModel = oParentDialog.getModel("newValor");
                 oValorModel.setProperty("/idvalorpa", null);
                 oValorModel.setProperty("/idvalorpaDisplay", "");
-                
-                // Actualizar ComboBox
                 const oComboBox = this.byId("valComboBoxIdValorPa");
                 if (oComboBox) {
                     oComboBox.setSelectedKey("");
                 }
-                
-                // Ocultar botón de limpiar
                 this.byId("valClearButton").setVisible(false);
             }
-            
             this.onCloseValorPadreDialog();
         },
 
-        /**
-         * Cerrar el diálogo de Value Help
-         */
         onCloseValorPadreDialog: function() {
-            if (this._pValorPadreDialog) {
+             if (this._pValorPadreDialog) {
                 this._pValorPadreDialog.then((oDialog) => {
                     oDialog.close();
                 });
             }
         },
 
-        /**
-         * Limpiar selección desde el botón externo
-         */
         onClearValorPadre: function(oEvent) {
             const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
             const oValorModel = oDialog.getModel("newValor");
-            
             oValorModel.setProperty("/idvalorpa", null);
             oValorModel.setProperty("/idvalorpaDisplay", "");
-            
-            // Limpiar ComboBox
             const oComboBox = this.byId("valComboBoxIdValorPa");
             if (oComboBox) {
                 oComboBox.setSelectedKey("");
             }
-            
-            // Ocultar botón de limpiar
             oEvent.getSource().setVisible(false);
         },
 
-        /**
-         * Modificar onSaveNewValor para usar el valor seleccionado
-         */
         onSaveNewValor: function (oEvent) {
-            const oDialog = oEvent.getSource().getParent();
+             const oDialog = oEvent.getSource().getParent();
             if (!oDialog) {
                 MessageBox.error("No se pudo encontrar el diálogo.");
                 return;
@@ -588,7 +525,7 @@ sap.ui.define([
             const sParentKey = oValorModel.getProperty("/parentKey");
             const sSociedad = oValorModel.getProperty("/idsociedad");
             const sCedi = oValorModel.getProperty("/idcedi");
-            const sIdValorPa = oValorModel.getProperty("/idvalorpa"); // *** VALOR DEL VALUE HELP ***
+            const sIdValorPa = oValorModel.getProperty("/idvalorpa"); 
 
             const oView = this.getView();
             const sIdValor = oView.byId("valInputIdValor").getValue();
@@ -611,7 +548,7 @@ sap.ui.define([
                 idcedi: sCedi,
                 idvalor: sIdValor,
                 valor: sValor,
-                idvalorpa: sIdValorPa || null, // *** USAR VALOR DEL VALUE HELP ***
+                idvalorpa: sIdValorPa || null, 
                 secuencia: parseInt(oView.byId("valInputSecuencia").getValue() || "0", 10),
                 imagen: oView.byId("valInputImagen").getValue(),
                 ruta: oView.byId("valInputRuta").getValue(),
@@ -639,68 +576,61 @@ sap.ui.define([
                 payload: apiPayload 
             };
             
-            
             this._labelService.addOperation(operation);
 
             const dataModel = this.getView().getModel();
-                    const aLabels = dataModel.getProperty("/labels");
+            const aLabels = dataModel.getProperty("/labels");
                 
-                    const aUpdatedLabels = aLabels.map(label => {
+            const aUpdatedLabels = aLabels.map(label => {
                     if (label.idetiqueta === sParentKey) {
-                // Encontramos el padre
-                const aChildren = label.children || [];
-                return {
-                    ...label,
-                    children: [...aChildren, newLocalData]  // Agregar el nuevo valor
-                };
-            }
-            return label;  
-        });
+                    const aChildren = label.children || [];
+                    return {
+                        ...label,
+                        children: [...aChildren, newLocalData] 
+                    };
+                }
+                return label;  
+            });
             dataModel.setProperty("/labels", aUpdatedLabels);
             const oTable = this.byId("treeTable");
             if (oTable) {
                 const iParentIndex = aLabels.findIndex(label => label.idetiqueta === sParentKey);
                 if (iParentIndex >= 0 && !oTable.isExpanded(iParentIndex)) {
-                    oTable.expand(iParentIndex);  // Mostrar el nuevo valor inmediatamente
+                    oTable.expand(iParentIndex); 
                 }
             }
             let iTotalRows = 0;
             aUpdatedLabels.forEach(parent => {
-                iTotalRows++; // Contar el padre
+                iTotalRows++; 
                 if (parent.children) {
-                    iTotalRows += parent.children.length; // Contar los hijos
+                    iTotalRows += parent.children.length; 
                 }
             });
             dataModel.setProperty("/totalRows", iTotalRows);
-
-            // Mostrar mensaje de éxito
             MessageToast.show("Valor agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
             this.onCloseNewValor();
         },
 
-        /**
-         * Modificar _clearNewValorForm para limpiar también el Value Help
-         */
         _clearNewValorForm: function() {
             this.byId("valInputIdValor")?.setValue("");
             this.byId("valInputValor")?.setValue("");
-            this.byId("valComboBoxIdValorPa")?.setSelectedKey(""); // *** LIMPIAR COMBOBOX ***
-            this.byId("valClearButton")?.setVisible(false); // *** OCULTAR BOTÓN ***
+            this.byId("valComboBoxIdValorPa")?.setSelectedKey(""); 
+            this.byId("valClearButton")?.setVisible(false); 
             this.byId("valInputSecuencia")?.setValue("0");
             this.byId("valInputImagen")?.setValue("");
             this.byId("valInputRuta")?.setValue("");
             this.byId("valTextAreaDescripcion")?.setValue("");
         },
 
-        // Agregar al onExit para limpiar el diálogo
         onExit: function () {
             this._pNewCatalogoDialog = null;
             this._pNewValorDialog = null;
             this._pUpdateDialog = null;
-            this._pValorPadreDialog = null; // *** NUEVO ***
+            this._pValorPadreDialog = null; 
         },
+
         onSaveChanges: function () {
-            const viewModel = this.getView().getModel("view");
+             const viewModel = this.getView().getModel("view");
             viewModel.setProperty("/busy", true);
 
             this._labelService.saveChanges()
@@ -724,7 +654,7 @@ sap.ui.define([
         },
 
         onRefresh: function () {
-            const oSearchField = this.byId("searchField");
+             const oSearchField = this.byId("searchField");
             if (oSearchField) {
                 oSearchField.setValue("");
             }
@@ -732,7 +662,7 @@ sap.ui.define([
             const oTable = this.byId("treeTable");
             const oBinding = oTable.getBinding("rows");
             if (oBinding) {
-                oBinding.filter([]); // 🔄 Limpia filtros
+                oBinding.filter([]); 
             }
             this._loadLabels();
         },
@@ -755,37 +685,23 @@ sap.ui.define([
             }
         },
 
-        /**
-         * Se dispara cuando el usuario presiona Enter en el MultiInput del fragmento.
-         */
         onFragmentSubmit: function (oEvent) {
-            const oMultiInput = oEvent.getSource();
-            const sValue = oEvent.getParameter("value"); // Texto que el usuario escribió
+             const oMultiInput = oEvent.getSource();
+            const sValue = oEvent.getParameter("value"); 
 
             if (sValue && sValue.trim() !== "") {
-                // 1. Crear un nuevo Token
                 const oNewToken = new Token({
                     key: sValue.trim(),
                     text: sValue.trim()
                 });
-
-                // 2. Añadir el token al MultiInput
                 oMultiInput.addToken(oNewToken);
             }
-
-            // 3. Limpiar el campo de texto del MultiInput
             oMultiInput.setValue("");
         },
 
-        // Método para abrir el diálogo (inicializa el estado de validación)
-
-
-        // Inicializar el modelo de validación
         _initValidationModel: function() {
-            const oView = this.getView();
+             const oView = this.getView();
             const oModel = oView.getModel();
-            
-            // Resetear estados de validación
             oModel.setProperty("/validationState", {
                 idSociedad: "None",
                 idCedi: "None",
@@ -794,9 +710,8 @@ sap.ui.define([
             });
         },
 
-        // Validar todos los campos requeridos
         _validateRequiredFields: function() {
-            const oView = this.getView();
+             const oView = this.getView();
             const oModel = oView.getModel();
             
             let isValid = true;
@@ -807,41 +722,27 @@ sap.ui.define([
                 etiqueta: "None"
             };
             
-            // Validar ID Sociedad
-            const sSociedad = oView.byId("inputIdSociedad").getValue();
-            if (!sSociedad || sSociedad.trim() === "") {
-                validationState.idSociedad = "Error";
-                isValid = false;
-            }
+            // --- MODIFICADO: Eliminadas las validaciones de Sociedad y CEDI ---
+            // Ya no son obligatorios
+            // -----------------------------------------------------------------
             
-            // Validar ID CEDI
-            const sCedi = oView.byId("inputIdCedi").getValue();
-            if (!sCedi || sCedi.trim() === "") {
-                validationState.idCedi = "Error";
-                isValid = false;
-            }
-            
-            // Validar ID Etiqueta
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             if (!sIdEtiqueta || sIdEtiqueta.trim() === "") {
                 validationState.idEtiqueta = "Error";
                 isValid = false;
             }
             
-            // Validar Etiqueta
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
             if (!sEtiqueta || sEtiqueta.trim() === "") {
                 validationState.etiqueta = "Error";
                 isValid = false;
             }
             
-            // Actualizar estados visuales
             oModel.setProperty("/validationState", validationState);
             
             return isValid;
         },
 
-        // Limpiar estados de validación
         _clearValidationStates: function() {
             const oModel = this.getView().getModel();
             oModel.setProperty("/validationState", {
@@ -853,40 +754,33 @@ sap.ui.define([
         },
 
         onSaveNewCatalogo: function () {
-            // 1. Validar campos requeridos PRIMERO
             if (!this._validateRequiredFields()) {
                 MessageBox.error(
                     "Por favor, complete todos los campos marcados como obligatorios.",
-                    {
-                        title: "Campos Incompletos"
-                    }
+                    { title: "Campos Incompletos" }
                 );
                 return;
             }
             
-            // 2. Leer todos los valores del formulario del fragmento
             const oView = this.getView();
-            const sSociedad = oView.byId("inputIdSociedad").getValue();
-            const sCedi = oView.byId("inputIdCedi").getValue();
+            
+            // Obtener valores (pueden ser vacíos ahora)
+            const sSociedad = oView.byId("inputIdSociedad").getSelectedKey() || "";
+            const sCedi = oView.byId("inputIdCedi").getSelectedKey() || "";
+            
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
 
-            // 3. Leer los Tokens del MultiInput
             const oMultiInput = oView.byId("fragmentInputIndice");
             const aTokens = oMultiInput.getTokens();
 
-            // --- PASO 4: Preparar datos para el MODELO LOCAL y la API ---
-
-            // Para el MODELO LOCAL (la tabla):
             const aIndiceAsObjects = aTokens.map(oToken => ({
                 key: oToken.getKey(),
                 text: oToken.getText()
             }));
 
-            // Para la API (el payload):
             const sIndiceForAPI = aTokens.map(oToken => oToken.getKey()).join(',');
 
-            // 5. Construir el objeto de datos para el MODELO LOCAL (minúsculas)
             const newData = {
                 idsociedad: sSociedad,
                 idcedi: sCedi,
@@ -903,7 +797,6 @@ sap.ui.define([
                 uiState: "Success" 
             };
 
-            // 6. Construir el PAYLOAD para la API
             const apiPayload = {
                 IDSOCIEDAD: newData.idsociedad,
                 IDCEDI: newData.idcedi,
@@ -918,43 +811,42 @@ sap.ui.define([
                 DESCRIPCION: newData.descripcion
             };
 
-            // 7. Crear la operación
             const operation = {
                 collection: "labels",
                 action: "CREATE",
                 payload: apiPayload
             };
 
-            // 8. Añadir al servicio
             this._labelService.addOperation(operation);
 
-            // --- PASO 9: AÑADIR EL REGISTRO AL MODELO LOCAL ---
             const oModel = this.getView().getModel();
             const aLabels = oModel.getProperty("/labels");
 
-            // Añadimos el nuevo registro al inicio del arreglo
             aLabels.unshift(newData); 
 
-            // Actualizamos el modelo
             oModel.setProperty("/labels", aLabels);
             
-            // (Opcional) Actualizar contador total
             const oViewModel = this.getView().getModel("view");
             oViewModel.setProperty("/totalRows", aLabels.length);
 
             MessageToast.show("Catálogo agregado a la tabla. Presione 'Guardar Cambios' para confirmar.");
-
-            // 10. Cerrar y limpiar
             this.onCloseNewCatalogo();
         },
 
         onCloseNewCatalogo: function () {
-            // --- Limpiamos los campos ---
-            this.byId("inputIdSociedad")?.setValue("");
-            this.byId("inputIdCedi")?.setValue("");
+            this.byId("inputIdSociedad")?.setSelectedKey("");
+            this.byId("inputIdCedi")?.setSelectedKey("");
+            
+            // Resetear filtro de CEDIs
+            const oCatalogsModel = this.getView().getModel("catalogs");
+            if(oCatalogsModel) {
+                oCatalogsModel.setProperty("/cedis", []);
+                oCatalogsModel.setProperty("/cedisEnabled", false);
+            }
+            
             this.byId("inputIdEtiqueta")?.setValue("");
             this.byId("inputEtiqueta")?.setValue("");
-            this.byId("fragmentInputIndice")?.setTokens([]); // Limpiamos el MultiInput
+            this.byId("fragmentInputIndice")?.setTokens([]); 
             this.byId("inputColeccion")?.setValue("");
             this.byId("inputSeccion")?.setValue("");
             this.byId("inputSecuencia")?.setValue("0");
@@ -968,7 +860,6 @@ sap.ui.define([
             }
         },
         
-
         onSaveUpdate: function (oEvent) {
             const oDialog = oEvent?.getSource()?.getParent?.() || this._updateDialog;
             if (!oDialog) {
@@ -982,7 +873,6 @@ sap.ui.define([
             }
             const updatedData = updateModel.getData();
         
-            // Helper: tokens -> string "a,b,c"
             const tokensToString = function (value) {
                 if (Array.isArray(value)) {
                     return value
@@ -1010,8 +900,9 @@ sap.ui.define([
         
             let operation;
             if (updatedData.parent) {
-                // UPDATE de etiqueta (labels)
                 const updates = {
+                    IDSOCIEDAD: updatedData.idsociedad,
+                    IDCEDI: updatedData.idcedi,
                     ETIQUETA: updatedData.etiqueta,
                     INDICE: tokensToString(updatedData.indice),
                     COLECCION: updatedData.coleccion || "",
@@ -1031,8 +922,9 @@ sap.ui.define([
                     }
                 };
             } else {
-                // UPDATE de valor (values)
                 const updates = {
+                    IDSOCIEDAD: updatedData.idsociedad,
+                    IDCEDI: updatedData.idcedi,
                     VALOR: updatedData.valor,
                     ALIAS: updatedData.alias || "",
                     SECUENCIA: Number(updatedData.secuencia) || 0,
@@ -1054,7 +946,6 @@ sap.ui.define([
         
             this._labelService.addOperation(operation);
         
-            // Actualiza modelo local y cierra
             const dataModel = this.getView().getModel();
             const labels = dataModel.getProperty("/labels");
         
@@ -1084,13 +975,12 @@ sap.ui.define([
         },
 
         onSearch: function (oEvent) {
-            const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
+             const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
             const oTable = this.byId("treeTable");
             const oBinding = oTable.getBinding("rows");
 
             if (!oBinding) return;
 
-            // 🔍 Campos que queremos filtrar
             const aFilters = [];
             if (sQuery) {
                 const sLower = sQuery.toLowerCase();
@@ -1102,16 +992,12 @@ sap.ui.define([
                             new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
                             new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery)
                         ],
-                        and: false // OR lógico entre los campos
+                        and: false 
                     })
                 );
             }
-
             oBinding.filter(aFilters);
         },
-
-        
-
 
     });
 });

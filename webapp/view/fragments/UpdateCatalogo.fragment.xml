@@ -19,15 +19,23 @@
                 labelSpanS="12">
                 
                 <form:content>
-                    <Label text="ID Sociedad" required="true"/>
-                    <Input id="updateInputIdSociedad" 
-                           value= "{update>/idsociedad}" 
-                           editable="false"/>
+                    <Label text="ID Sociedad"/>
+                    <ComboBox id="updateInputIdSociedad" 
+                           selectedKey="{update>/idsociedad}" 
+                           items="{catalogs>/sociedades}"
+                           editable="true"
+                           selectionChange=".onSociedadChange">
+                           <core:Item key="{catalogs>idvalor}" text="{catalogs>valor} ({catalogs>idvalor})" />
+                    </ComboBox>
                     
-                    <Label text="ID CEDI" required="true"/>
-                    <Input id="updateInputIdCedi" 
-                           value= "{update>/idcedi}" 
-                           editable="false"/>
+                    <Label text="ID CEDI"/>
+                    <ComboBox id="updateInputIdCedi" 
+                           selectedKey="{update>/idcedi}" 
+                           items="{catalogs>/cedis}"
+                           editable="true"
+                           enabled="{catalogs>/cedisEnabled}">
+                           <core:Item key="{catalogs>idvalor}" text="{catalogs>valor} ({catalogs>idvalor})" />
+                    </ComboBox>
 
                     <Label text="ID Etiqueta" required="true"
                            visible="{= ${update>/parent} === true }"/>
