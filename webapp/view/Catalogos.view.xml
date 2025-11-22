@@ -143,6 +143,15 @@
                             </table:template>
                         </table:Column>
 
+                        <!-- ALIAS -->
+                        <table:Column width="130px" sortProperty="alias"
+                            filterProperty="alias">
+                            <Label text="Alias" />
+                            <table:template>
+                                <Text text="{alias}" wrapping="false" />
+                            </table:template>
+                        </table:Column>
+
                         <!-- INDICE -->
                         <table:Column width="250px">
                             <Label text="Índice" />
