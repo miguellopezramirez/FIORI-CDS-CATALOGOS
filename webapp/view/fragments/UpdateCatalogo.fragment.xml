@@ -72,7 +72,7 @@
                         justifyContent="SpaceBetween"
                         visible="{= ${update>/parent} === false }">
                         <ComboBox
-                            id="valComboBoxIdValorPa"
+                            id="valComboBoxIdValorPa_2"
                             width="100%"
                             placeholder="Buscar o seleccionar valor padre..."
                             selectionChange=".onValorPadreComboChange"
@@ -81,7 +81,7 @@
                             items="{valueHelp>/flatItems}">
                             <core:ListItem 
                                 key="{valueHelp>idvalor}"
-                                text="{valueHelp>valor}"
+                                text="{valueHelp>valor} ({valueHelp>idvalor})"
                                 additionalText="{valueHelp>etiqueta}"/>
                             <layoutData>
                                 <FlexItemData growFactor="1" />
@@ -93,7 +93,7 @@
                             press=".onOpenValorPadreDialog"
                             tooltip="Abrir ayuda de valor"/>
                         <Button
-                            id="valClearButton"
+                            id="valClearButton_2"
                             icon="sap-icon://decline"
                             type="Transparent"
                             visible="false"
