@@ -134,7 +134,10 @@
                             filterProperty="idvalorpa">
                             <Label text="Valor Padre" />
                             <table:template>
-                                <Text text="{idvalorpa}" wrapping="false" />
+                                <Text text="{
+                                    path: 'idvalorpa',
+                                    formatter: '.getValorPadreDescription'
+                                }" wrapping="false" />
                             </table:template>
                         </table:Column>
 

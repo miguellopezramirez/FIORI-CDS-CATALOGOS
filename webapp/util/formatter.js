@@ -88,6 +88,47 @@ sap.ui.define([], function () {
 
             // Si se encuentra, retornar el VALOR, sino retornar el ID original
             return oSociedadValue ? oSociedadValue.valor : idsociedad;
+        },
+
+        /**
+         * Obtiene la descripción del VALOR PADRE basándose en el idvalorpa
+         * Busca en TODOS los valores de todas las etiquetas
+         * @param {string} idvalorpa - ID del Valor Padre a buscar
+         * @param {object} oController - Referencia al controlador para acceder al modelo
+         * @returns {string} Descripción del Valor Padre o el ID original si no se encuentra
+         */
+        getValorPadreDescription: function (idvalorpa, oController) {
+            // Caso especial: si es "0", null o vacío, retornar vacío
+            if (!idvalorpa || String(idvalorpa) === "0") {
+                return "";
+            }
+
+            if (!oController) {
+                return idvalorpa;
+            }
+
+            const dataModel = oController.getView().getModel();
+            const aLabels = dataModel.getProperty("/labels") || [];
+
+            // Normalizar el idvalorpa eliminando ceros a la izquierda para comparación
+            const normalizedIdValorPa = String(idvalorpa).replace(/^0+/, '') || '0';
+
+            // Buscar en todas las etiquetas y sus hijos
+            for (const label of aLabels) {
+                if (label.children) {
+                    const foundChild = label.children.find(child => {
+                        const normalizedChildId = String(child.idvalor).replace(/^0+/, '') || '0';
+                        return normalizedChildId === normalizedIdValorPa;
+                    });
+
+                    if (foundChild) {
+                        return foundChild.valor;
+                    }
+                }
+            }
+
+            // Si no se encuentra, retornar el ID original
+            return idvalorpa;
         }
     };
 });

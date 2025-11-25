@@ -96,6 +96,13 @@ sap.ui.define([
             return formatter.getSociedadDescription(idsociedad, this);
         },
 
+        /**
+         * Obtiene la descripción del VALOR PADRE basándose en el idvalorpa
+         */
+        getValorPadreDescription: function (idvalorpa) {
+            return formatter.getValorPadreDescription(idvalorpa, this);
+        },
+
         // --- NUEVA FUNCIÓN: Manejar cambio de sociedad (filtrado en cascada) ---
         onSociedadChange: function (oEvent) {
             const sSelectedSociedadKey = oEvent.getParameter("selectedKey");
@@ -990,29 +997,29 @@ sap.ui.define([
         },
 
         onSearch: function (oEvent) {
-            const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
+            const sQuery = oEvent.getParameter("newValue");
             const oTable = this.byId("treeTable");
             const oBinding = oTable.getBinding("rows");
 
-            if (!oBinding) return;
+            if (!oBinding) {
+                return;
+            }
 
             const aFilters = [];
-            if (sQuery) {
-                const sLower = sQuery.toLowerCase();
-                aFilters.push(
-                    new sap.ui.model.Filter({
-                        filters: [
-                            new sap.ui.model.Filter("etiqueta", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("descripcion", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery)
-                        ],
-                        and: false
-                    })
-                );
+            if (sQuery && sQuery.length > 0) {
+                aFilters.push(new sap.ui.model.Filter({
+                    filters: [
+                        new sap.ui.model.Filter("etiqueta", sap.ui.model.FilterOperator.Contains, sQuery),
+                        new sap.ui.model.Filter("descripcion", sap.ui.model.FilterOperator.Contains, sQuery),
+                        new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
+                        new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery),
+                        new sap.ui.model.Filter("valor", sap.ui.model.FilterOperator.Contains, sQuery)
+                    ],
+                    and: false
+                }));
             }
             oBinding.filter(aFilters);
-        },
+        }
 
     });
 });
