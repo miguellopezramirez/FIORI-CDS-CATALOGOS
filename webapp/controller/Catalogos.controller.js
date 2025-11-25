@@ -468,6 +468,10 @@ sap.ui.define(
           const oValorModel = oDialog.getModel(sModelName);
           if (oValorModel) {
             oValorModel.setProperty("/idvalorpa", sIdValor);
+            oValorModel.setProperty(
+              "/idvalorpaDisplay",
+              oSelectedItem.getText()
+            );
           }
 
           const oClearButton = this.byId(sClearBtnId);
@@ -602,7 +606,7 @@ sap.ui.define(
             const oValorModel = oParentDialog.getModel(sModelName);
             if (oValorModel) {
               oValorModel.setProperty("/idvalorpa", sIdValor);
-              // oValorModel.setProperty("/idvalorpaDisplay", sValor);
+              oValorModel.setProperty("/idvalorpaDisplay", sValor);
             }
 
             const oComboBox = this.byId(sComboBoxId);
@@ -651,7 +655,7 @@ sap.ui.define(
           const oValorModel = oParentDialog.getModel(sModelName);
           if (oValorModel) {
             oValorModel.setProperty("/idvalorpa", null);
-            // oValorModel.setProperty("/idvalorpaDisplay", "");
+            oValorModel.setProperty("/idvalorpaDisplay", "");
           }
 
           const oComboBox = this.byId(sComboBoxId);
@@ -690,7 +694,7 @@ sap.ui.define(
         const oValorModel = oDialog.getModel(sModelName);
         if (oValorModel) {
           oValorModel.setProperty("/idvalorpa", null);
-          // oValorModel.setProperty("/idvalorpaDisplay", "");
+          oValorModel.setProperty("/idvalorpaDisplay", "");
         }
 
         const oComboBox = this.byId(sComboBoxId);
