@@ -72,7 +72,7 @@
                         justifyContent="SpaceBetween"
                         visible="{= ${update>/parent} === false }">
                         <ComboBox
-                            id="valComboBoxIdValorPa"
+                            id="updateComboBoxIdValorPa"
                             width="100%"
                             placeholder="Buscar o seleccionar valor padre..."
                             selectionChange=".onValorPadreComboChange"
@@ -93,7 +93,7 @@
                             press=".onOpenValorPadreDialog"
                             tooltip="Abrir ayuda de valor"/>
                         <Button
-                            id="valClearButton"
+                            id="updateClearButton"
                             icon="sap-icon://decline"
                             type="Transparent"
                             visible="false"

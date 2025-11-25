@@ -400,18 +400,39 @@ sap.ui.define([
             if (oSelectedItem) {
                 const sIdValor = oSelectedItem.getKey();
                 const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
+
+                // Detectar qué diálogo está abierto
                 const oValorModel = oDialog.getModel("newValor");
-                oValorModel.setProperty("/idvalorpa", sIdValor);
-                oValorModel.setProperty("/idvalorpaDisplay", oSelectedItem.getText());
-                this.byId("valClearButton").setVisible(true);
+                const oUpdateModel = oDialog.getModel("update");
+
+                if (oValorModel) {
+                    // Diálogo "Nuevo Valor"
+                    oValorModel.setProperty("/idvalorpa", sIdValor);
+                    oValorModel.setProperty("/idvalorpaDisplay", oSelectedItem.getText());
+                    this.byId("valClearButton").setVisible(true);
+                } else if (oUpdateModel) {
+                    // Diálogo "Modificar"
+                    oUpdateModel.setProperty("/idvalorpa", sIdValor);
+                    this.byId("updateClearButton").setVisible(true);
+                }
             }
         },
 
         onOpenValorPadreDialog: function (oEvent) {
             const oParentDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
             const oValueHelpModel = oParentDialog.getModel("valueHelp");
+
+            // Detectar qué diálogo está abierto
             const oValorModel = oParentDialog.getModel("newValor");
-            const sCurrentValue = oValorModel.getProperty("/idvalorpa");
+            const oUpdateModel = oParentDialog.getModel("update");
+
+            let sCurrentValue = null;
+            if (oValorModel) {
+                sCurrentValue = oValorModel.getProperty("/idvalorpa");
+            } else if (oUpdateModel) {
+                sCurrentValue = oUpdateModel.getProperty("/idvalorpa");
+            }
+
             const aGroupedItems = oValueHelpModel.getProperty("/groupedItems");
             aGroupedItems.forEach(item => {
                 if (!item.isGroup) {
@@ -467,16 +488,21 @@ sap.ui.define([
                 const sValor = oData.valor;
 
                 const aDialogs = this.getView().getDependents();
-                let oParentDialog = null;
+                let oNewValorDialog = null;
+                let oUpdateDialog = null;
+
                 for (let i = 0; i < aDialogs.length; i++) {
-                    if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" &&
-                        aDialogs[i].getTitle() === "Nuevo Valor") {
-                        oParentDialog = aDialogs[i];
-                        break;
+                    if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog") {
+                        if (aDialogs[i].getTitle() === "Nuevo Valor") {
+                            oNewValorDialog = aDialogs[i];
+                        } else if (aDialogs[i].getTitle() === "Modificar Registro") {
+                            oUpdateDialog = aDialogs[i];
+                        }
                     }
                 }
-                if (oParentDialog) {
-                    const oValorModel = oParentDialog.getModel("newValor");
+
+                if (oNewValorDialog) {
+                    const oValorModel = oNewValorDialog.getModel("newValor");
                     oValorModel.setProperty("/idvalorpa", sIdValor);
                     oValorModel.setProperty("/idvalorpaDisplay", sValor);
                     const oComboBox = this.byId("valComboBoxIdValorPa");
@@ -487,6 +513,17 @@ sap.ui.define([
                     if (oClearButton) {
                         oClearButton.setVisible(true);
                     }
+                } else if (oUpdateDialog) {
+                    const oUpdateModel = oUpdateDialog.getModel("update");
+                    oUpdateModel.setProperty("/idvalorpa", sIdValor);
+                    const oComboBox = this.byId("updateComboBoxIdValorPa");
+                    if (oComboBox) {
+                        oComboBox.setSelectedKey(sIdValor);
+                    }
+                    const oClearButton = this.byId("updateClearButton");
+                    if (oClearButton) {
+                        oClearButton.setVisible(true);
+                    }
                 }
                 this.onCloseValorPadreDialog();
             }
@@ -494,17 +531,21 @@ sap.ui.define([
 
         onClearValorPadreFromDialog: function () {
             const aDialogs = this.getView().getDependents();
-            let oParentDialog = null;
+            let oNewValorDialog = null;
+            let oUpdateDialog = null;
 
             for (let i = 0; i < aDialogs.length; i++) {
-                if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" &&
-                    aDialogs[i].getTitle() === "Nuevo Valor") {
-                    oParentDialog = aDialogs[i];
-                    break;
+                if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog") {
+                    if (aDialogs[i].getTitle() === "Nuevo Valor") {
+                        oNewValorDialog = aDialogs[i];
+                    } else if (aDialogs[i].getTitle() === "Modificar Registro") {
+                        oUpdateDialog = aDialogs[i];
+                    }
                 }
             }
-            if (oParentDialog) {
-                const oValorModel = oParentDialog.getModel("newValor");
+
+            if (oNewValorDialog) {
+                const oValorModel = oNewValorDialog.getModel("newValor");
                 oValorModel.setProperty("/idvalorpa", null);
                 oValorModel.setProperty("/idvalorpaDisplay", "");
                 const oComboBox = this.byId("valComboBoxIdValorPa");
@@ -512,6 +553,14 @@ sap.ui.define([
                     oComboBox.setSelectedKey("");
                 }
                 this.byId("valClearButton").setVisible(false);
+            } else if (oUpdateDialog) {
+                const oUpdateModel = oUpdateDialog.getModel("update");
+                oUpdateModel.setProperty("/idvalorpa", null);
+                const oComboBox = this.byId("updateComboBoxIdValorPa");
+                if (oComboBox) {
+                    oComboBox.setSelectedKey("");
+                }
+                this.byId("updateClearButton").setVisible(false);
             }
             this.onCloseValorPadreDialog();
         },
@@ -526,12 +575,26 @@ sap.ui.define([
 
         onClearValorPadre: function (oEvent) {
             const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
+
+            // Detectar qué diálogo está abierto
             const oValorModel = oDialog.getModel("newValor");
-            oValorModel.setProperty("/idvalorpa", null);
-            oValorModel.setProperty("/idvalorpaDisplay", "");
-            const oComboBox = this.byId("valComboBoxIdValorPa");
-            if (oComboBox) {
-                oComboBox.setSelectedKey("");
+            const oUpdateModel = oDialog.getModel("update");
+
+            if (oValorModel) {
+                // Diálogo "Nuevo Valor"
+                oValorModel.setProperty("/idvalorpa", null);
+                oValorModel.setProperty("/idvalorpaDisplay", "");
+                const oComboBox = this.byId("valComboBoxIdValorPa");
+                if (oComboBox) {
+                    oComboBox.setSelectedKey("");
+                }
+            } else if (oUpdateModel) {
+                // Diálogo "Modificar"
+                oUpdateModel.setProperty("/idvalorpa", null);
+                const oComboBox = this.byId("updateComboBoxIdValorPa");
+                if (oComboBox) {
+                    oComboBox.setSelectedKey("");
+                }
             }
             oEvent.getSource().setVisible(false);
         },
