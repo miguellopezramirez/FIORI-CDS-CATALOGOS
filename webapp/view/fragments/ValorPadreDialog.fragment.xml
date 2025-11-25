@@ -36,7 +36,7 @@
                     selected="{valueHelp>selected}">
                     
                     <customData>
-                        <core:CustomData key="idvalor" value="{valueHelp>idvalor}"/>
+                        <core:CustomData key="idvalor" value="   {valueHelp>idvalor} ({valueHelp>idvalor})"/>
                         <core:CustomData key="isGroup" value="{valueHelp>isGroup}"/>
                     </customData>
                     
@@ -62,8 +62,9 @@
                             class="sapUiTinyMarginTopBottom">
                             <VBox width="100%" class="sapUiSmallMarginBegin">
                                 <Text 
-                                    text="{valueHelp>valor}" 
-                                    class="sapUiSmallMarginBottom"/>
+                                    text="{valueHelp>valor} ({valueHelp>idvalor})" 
+                                    class="sapUiSmallMarginBottom"
+                                    additionalText = "{valueHelp>etiqueta}"/>
                             </VBox>
                         </HBox>
                         

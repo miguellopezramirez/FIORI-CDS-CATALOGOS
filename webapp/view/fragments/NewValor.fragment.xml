@@ -39,7 +39,7 @@
                             items="{valueHelp>/flatItems}">
                             <core:ListItem 
                                 key="{valueHelp>idvalor}" 
-                                text="{valueHelp>valor}"
+                                text="{valueHelp>valor} ({valueHelp>idvalor})"
                                 additionalText="{valueHelp>etiqueta}"/>
                             <layoutData>
                                 <FlexItemData growFactor="1" />
