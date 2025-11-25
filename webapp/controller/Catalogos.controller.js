@@ -5,8 +5,9 @@ sap.ui.define([
     "sap/m/MessageBox",
     "sap/m/MessageToast",
     "sap/ui/core/Fragment",
-    "sap/m/Token"
-], function (Controller, JSONModel, LabelService, MessageBox, MessageToast, Fragment, Token) {
+    "sap/m/Token",
+    "com/cat/sapfioricatalogs/util/formatter"
+], function (Controller, JSONModel, LabelService, MessageBox, MessageToast, Fragment, Token, formatter) {
     "use strict";
 
     return Controller.extend("com.cat.sapfioricatalogs.controller.Catalogos", {
@@ -29,7 +30,7 @@ sap.ui.define([
             var oConfigModel = this.getOwnerComponent().getModel("config");
 
             this._labelService = new LabelService();
-            this._labelService.setConfigModel(oConfigModel); 
+            this._labelService.setConfigModel(oConfigModel);
 
             this._loadLabels();
 
@@ -81,14 +82,28 @@ sap.ui.define([
                 });
         },
 
+        /**
+         * Obtiene la descripción del CEDI basándose en el idcedi
+         */
+        getCediDescription: function (idcedi) {
+            return formatter.getCediDescription(idcedi, this);
+        },
+
+        /**
+         * Obtiene la descripción de la SOCIEDAD basándose en el idsociedad
+         */
+        getSociedadDescription: function (idsociedad) {
+            return formatter.getSociedadDescription(idsociedad, this);
+        },
+
         // --- NUEVA FUNCIÓN: Manejar cambio de sociedad (filtrado en cascada) ---
-        onSociedadChange: function(oEvent) {
+        onSociedadChange: function (oEvent) {
             const sSelectedSociedadKey = oEvent.getParameter("selectedKey");
             this._filterCedis(sSelectedSociedadKey);
-            
+
             // Limpiar la selección actual del CEDI al cambiar de sociedad
             const sSourceId = oEvent.getSource().getId();
-            
+
             // Detectar si es el diálogo de Nuevo o Modificar para limpiar el input correcto
             if (sSourceId.includes("updateInputIdSociedad")) {
                 this.byId("updateInputIdCedi").setSelectedKey(null);
@@ -98,12 +113,12 @@ sap.ui.define([
         },
 
         // --- NUEVA FUNCIÓN HELPER: Filtrar CEDIs por VALOR PADRE ---
-// En Catalogos.controller.js
+        // En Catalogos.controller.js
 
-        _filterCedis: function(sParentKey) {
+        _filterCedis: function (sParentKey) {
             const oCatalogsModel = this.getView().getModel("catalogs");
             const aAllCedis = oCatalogsModel.getProperty("/allCedis");
-            
+
             if (!sParentKey) {
                 oCatalogsModel.setProperty("/cedis", []);
                 oCatalogsModel.setProperty("/cedisEnabled", false);
@@ -112,10 +127,10 @@ sap.ui.define([
 
             // CORRECCIÓN: Convertir ambos lados a String para asegurar que coincidan
             // independientemente de si son números o textos.
-            const aFilteredCedis = aAllCedis.filter(cedi => 
+            const aFilteredCedis = aAllCedis.filter(cedi =>
                 String(cedi.idvalorpa) === String(sParentKey)
             );
-            
+
             console.log("Filtrando CEDIs para Sociedad:", sParentKey); // Para depurar
             console.log("Encontrados:", aFilteredCedis.length);        // Para depurar
 
@@ -144,7 +159,7 @@ sap.ui.define([
                 viewModel.setProperty("/selectedLabel", null);
             }
         },
-        
+
         onTokenUpdate: function (oEvent) {
             const sType = oEvent.getParameter("type");
             const oSource = oEvent.getSource();
@@ -183,10 +198,10 @@ sap.ui.define([
                     return oDialog;
                 });
             }
-            
+
             // Al abrir nuevo, limpiamos filtros
             const oCatalogsModel = this.getView().getModel("catalogs");
-            if(oCatalogsModel){
+            if (oCatalogsModel) {
                 oCatalogsModel.setProperty("/cedis", []);
                 oCatalogsModel.setProperty("/cedisEnabled", false);
             }
@@ -212,12 +227,12 @@ sap.ui.define([
             if (oUpdateData.idsociedad) {
                 this._filterCedis(oUpdateData.idsociedad);
             } else {
-                 // Si no tiene sociedad, limpiar lista
-                 const oCatalogsModel = this.getView().getModel("catalogs");
-                 if(oCatalogsModel){
+                // Si no tiene sociedad, limpiar lista
+                const oCatalogsModel = this.getView().getModel("catalogs");
+                if (oCatalogsModel) {
                     oCatalogsModel.setProperty("/cedis", []);
                     oCatalogsModel.setProperty("/cedisEnabled", false);
-                 }
+                }
             }
             // ---------------------------------------------------------------
 
@@ -237,15 +252,15 @@ sap.ui.define([
                 const oModel = this.getView().getModel();
                 const aLabels = oModel.getProperty("/labels");
                 const oValueHelpData = this._prepareValueHelpData(aLabels);
-                
+
                 const oValueHelpModel = new JSONModel(oValueHelpData);
                 oDialog.setModel(oValueHelpModel, "valueHelp");
             });
         },
 
         // ... (onDelete, _deleteRecord, onValorPadreChange se mantienen igual) ...
-         onDelete: function () {
-             const oTable = this.byId("treeTable");
+        onDelete: function () {
+            const oTable = this.byId("treeTable");
             const aSelectedIndices = oTable.getSelectedIndices();
 
             if (aSelectedIndices.length === 0) {
@@ -267,7 +282,7 @@ sap.ui.define([
                                 const oRecord = oContext.getObject();
                                 const sPath = oContext.getPath();
                                 this._deleteRecord(oRecord);
-                                oModel.setProperty(sPath + "/uiState", "Error"); 
+                                oModel.setProperty(sPath + "/uiState", "Error");
                             });
                             oTable.clearSelection();
                             this.getView().getModel("view").setProperty("/selectionCount", 0);
@@ -284,7 +299,7 @@ sap.ui.define([
             const sId = record.parent ? record.idetiqueta : record.idvalor;
 
             const operation = {
-                collection: sCollection, 
+                collection: sCollection,
                 action: "DELETE",
                 payload: {
                     id: sId
@@ -293,8 +308,8 @@ sap.ui.define([
             this._labelService.addOperation(operation);
         },
 
-        onValorPadreChange: function(oEvent) {
-             const sValue = oEvent.getParameter("value");
+        onValorPadreChange: function (oEvent) {
+            const sValue = oEvent.getParameter("value");
             const oSelectedItem = oEvent.getParameter("selectedItem");
             const oDialog = oEvent.getSource().getParent().getParent().getParent();
             const oValorModel = oDialog.getModel("newValor");
@@ -303,7 +318,7 @@ sap.ui.define([
 
         // ... (_prepareValueHelpData, onNewValor, onValorPadreComboChange etc. igual) ...
 
-        _prepareValueHelpData: function(aLabels) {
+        _prepareValueHelpData: function (aLabels) {
             const aFlatItems = [];
             const aGroupedItems = [];
             aLabels.forEach(oLabel => {
@@ -335,7 +350,7 @@ sap.ui.define([
         },
 
         onNewValor: function () {
-             const oViewModel = this.getView().getModel("view");
+            const oViewModel = this.getView().getModel("view");
             const oSelectedObject = oViewModel.getProperty("/selectedLabel");
 
             if (!oSelectedObject) {
@@ -373,8 +388,8 @@ sap.ui.define([
             });
         },
 
-        onValorPadreComboChange: function(oEvent) {
-             const oSelectedItem = oEvent.getParameter("selectedItem");
+        onValorPadreComboChange: function (oEvent) {
+            const oSelectedItem = oEvent.getParameter("selectedItem");
             if (oSelectedItem) {
                 const sIdValor = oSelectedItem.getKey();
                 const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
@@ -384,8 +399,8 @@ sap.ui.define([
                 this.byId("valClearButton").setVisible(true);
             }
         },
-        
-        onOpenValorPadreDialog: function(oEvent) {
+
+        onOpenValorPadreDialog: function (oEvent) {
             const oParentDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
             const oValueHelpModel = oParentDialog.getModel("valueHelp");
             const oValorModel = oParentDialog.getModel("newValor");
@@ -397,7 +412,7 @@ sap.ui.define([
                 }
             });
             oValueHelpModel.setProperty("/groupedItems", aGroupedItems);
-            
+
             if (!this._pValorPadreDialog) {
                 this._pValorPadreDialog = this.loadFragment({
                     name: "com.cat.sapfioricatalogs.view.fragments.ValorPadreDialog"
@@ -416,13 +431,13 @@ sap.ui.define([
             });
         },
 
-        onSearchValorPadre: function(oEvent) {
-             const sQuery = oEvent.getParameter("newValue");
+        onSearchValorPadre: function (oEvent) {
+            const sQuery = oEvent.getParameter("newValue");
             const oList = Fragment.byId(this.getView().getId(), "valorPadreList");
             const oBinding = oList.getBinding("items");
-            
+
             if (!oBinding) return;
-            
+
             const aFilters = [];
             if (sQuery) {
                 aFilters.push(new sap.ui.model.Filter({
@@ -436,18 +451,18 @@ sap.ui.define([
             oBinding.filter(aFilters);
         },
 
-        onSelectValorPadreFromDialog: function(oEvent) {
-             const oSelectedItem = oEvent.getParameter("listItem");
+        onSelectValorPadreFromDialog: function (oEvent) {
+            const oSelectedItem = oEvent.getParameter("listItem");
             if (oSelectedItem) {
                 const oContext = oSelectedItem.getBindingContext("valueHelp");
                 const oData = oContext.getObject();
                 const sIdValor = oData.idvalor;
                 const sValor = oData.valor;
-                
+
                 const aDialogs = this.getView().getDependents();
                 let oParentDialog = null;
                 for (let i = 0; i < aDialogs.length; i++) {
-                    if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
+                    if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" &&
                         aDialogs[i].getTitle() === "Nuevo Valor") {
                         oParentDialog = aDialogs[i];
                         break;
@@ -470,12 +485,12 @@ sap.ui.define([
             }
         },
 
-        onClearValorPadreFromDialog: function() {
-             const aDialogs = this.getView().getDependents();
+        onClearValorPadreFromDialog: function () {
+            const aDialogs = this.getView().getDependents();
             let oParentDialog = null;
-    
+
             for (let i = 0; i < aDialogs.length; i++) {
-                if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" && 
+                if (aDialogs[i].getMetadata().getName() === "sap.m.Dialog" &&
                     aDialogs[i].getTitle() === "Nuevo Valor") {
                     oParentDialog = aDialogs[i];
                     break;
@@ -494,15 +509,15 @@ sap.ui.define([
             this.onCloseValorPadreDialog();
         },
 
-        onCloseValorPadreDialog: function() {
-             if (this._pValorPadreDialog) {
+        onCloseValorPadreDialog: function () {
+            if (this._pValorPadreDialog) {
                 this._pValorPadreDialog.then((oDialog) => {
                     oDialog.close();
                 });
             }
         },
 
-        onClearValorPadre: function(oEvent) {
+        onClearValorPadre: function (oEvent) {
             const oDialog = oEvent.getSource().getParent().getParent().getParent().getParent();
             const oValorModel = oDialog.getModel("newValor");
             oValorModel.setProperty("/idvalorpa", null);
@@ -515,7 +530,7 @@ sap.ui.define([
         },
 
         onSaveNewValor: function (oEvent) {
-             const oDialog = oEvent.getSource().getParent();
+            const oDialog = oEvent.getSource().getParent();
             if (!oDialog) {
                 MessageBox.error("No se pudo encontrar el diálogo.");
                 return;
@@ -525,7 +540,7 @@ sap.ui.define([
             const sParentKey = oValorModel.getProperty("/parentKey");
             const sSociedad = oValorModel.getProperty("/idsociedad");
             const sCedi = oValorModel.getProperty("/idcedi");
-            const sIdValorPa = oValorModel.getProperty("/idvalorpa"); 
+            const sIdValorPa = oValorModel.getProperty("/idvalorpa");
 
             const oView = this.getView();
             const sIdValor = oView.byId("valInputIdValor").getValue();
@@ -540,7 +555,7 @@ sap.ui.define([
             }
             if (aErrors.length > 0) {
                 MessageBox.error(aErrors.join("\n"));
-                return; 
+                return;
             }
 
             const newLocalData = {
@@ -548,62 +563,62 @@ sap.ui.define([
                 idcedi: sCedi,
                 idvalor: sIdValor,
                 valor: sValor,
-                idvalorpa: sIdValorPa || null, 
+                idvalorpa: sIdValorPa || null,
                 secuencia: parseInt(oView.byId("valInputSecuencia").getValue() || "0", 10),
                 imagen: oView.byId("valInputImagen").getValue(),
                 ruta: oView.byId("valInputRuta").getValue(),
                 descripcion: oView.byId("valTextAreaDescripcion").getValue(),
-                parent: false, 
-                uiState: "Success" 
+                parent: false,
+                uiState: "Success"
             };
 
             const apiPayload = {
                 IDSOCIEDAD: newLocalData.idsociedad,
                 IDCEDI: newLocalData.idcedi,
-                IDETIQUETA: sParentKey, 
+                IDETIQUETA: sParentKey,
                 IDVALOR: newLocalData.idvalor,
                 VALOR: newLocalData.valor,
-                IDVALORPA: newLocalData.idvalorpa || undefined, 
+                IDVALORPA: newLocalData.idvalorpa || undefined,
                 SECUENCIA: newLocalData.secuencia,
                 IMAGEN: newLocalData.imagen,
-                ROUTE: newLocalData.ruta, 
+                ROUTE: newLocalData.ruta,
                 DESCRIPCION: newLocalData.descripcion
             };
 
             const operation = {
-                collection: "values", 
+                collection: "values",
                 action: "CREATE",
-                payload: apiPayload 
+                payload: apiPayload
             };
-            
+
             this._labelService.addOperation(operation);
 
             const dataModel = this.getView().getModel();
             const aLabels = dataModel.getProperty("/labels");
-                
+
             const aUpdatedLabels = aLabels.map(label => {
-                    if (label.idetiqueta === sParentKey) {
+                if (label.idetiqueta === sParentKey) {
                     const aChildren = label.children || [];
                     return {
                         ...label,
-                        children: [...aChildren, newLocalData] 
+                        children: [...aChildren, newLocalData]
                     };
                 }
-                return label;  
+                return label;
             });
             dataModel.setProperty("/labels", aUpdatedLabels);
             const oTable = this.byId("treeTable");
             if (oTable) {
                 const iParentIndex = aLabels.findIndex(label => label.idetiqueta === sParentKey);
                 if (iParentIndex >= 0 && !oTable.isExpanded(iParentIndex)) {
-                    oTable.expand(iParentIndex); 
+                    oTable.expand(iParentIndex);
                 }
             }
             let iTotalRows = 0;
             aUpdatedLabels.forEach(parent => {
-                iTotalRows++; 
+                iTotalRows++;
                 if (parent.children) {
-                    iTotalRows += parent.children.length; 
+                    iTotalRows += parent.children.length;
                 }
             });
             dataModel.setProperty("/totalRows", iTotalRows);
@@ -611,11 +626,11 @@ sap.ui.define([
             this.onCloseNewValor();
         },
 
-        _clearNewValorForm: function() {
+        _clearNewValorForm: function () {
             this.byId("valInputIdValor")?.setValue("");
             this.byId("valInputValor")?.setValue("");
-            this.byId("valComboBoxIdValorPa")?.setSelectedKey(""); 
-            this.byId("valClearButton")?.setVisible(false); 
+            this.byId("valComboBoxIdValorPa")?.setSelectedKey("");
+            this.byId("valClearButton")?.setVisible(false);
             this.byId("valInputSecuencia")?.setValue("0");
             this.byId("valInputImagen")?.setValue("");
             this.byId("valInputRuta")?.setValue("");
@@ -626,11 +641,11 @@ sap.ui.define([
             this._pNewCatalogoDialog = null;
             this._pNewValorDialog = null;
             this._pUpdateDialog = null;
-            this._pValorPadreDialog = null; 
+            this._pValorPadreDialog = null;
         },
 
         onSaveChanges: function () {
-             const viewModel = this.getView().getModel("view");
+            const viewModel = this.getView().getModel("view");
             viewModel.setProperty("/busy", true);
 
             this._labelService.saveChanges()
@@ -654,7 +669,7 @@ sap.ui.define([
         },
 
         onRefresh: function () {
-             const oSearchField = this.byId("searchField");
+            const oSearchField = this.byId("searchField");
             if (oSearchField) {
                 oSearchField.setValue("");
             }
@@ -662,7 +677,7 @@ sap.ui.define([
             const oTable = this.byId("treeTable");
             const oBinding = oTable.getBinding("rows");
             if (oBinding) {
-                oBinding.filter([]); 
+                oBinding.filter([]);
             }
             this._loadLabels();
         },
@@ -686,8 +701,8 @@ sap.ui.define([
         },
 
         onFragmentSubmit: function (oEvent) {
-             const oMultiInput = oEvent.getSource();
-            const sValue = oEvent.getParameter("value"); 
+            const oMultiInput = oEvent.getSource();
+            const sValue = oEvent.getParameter("value");
 
             if (sValue && sValue.trim() !== "") {
                 const oNewToken = new Token({
@@ -699,8 +714,8 @@ sap.ui.define([
             oMultiInput.setValue("");
         },
 
-        _initValidationModel: function() {
-             const oView = this.getView();
+        _initValidationModel: function () {
+            const oView = this.getView();
             const oModel = oView.getModel();
             oModel.setProperty("/validationState", {
                 idSociedad: "None",
@@ -710,10 +725,10 @@ sap.ui.define([
             });
         },
 
-        _validateRequiredFields: function() {
-             const oView = this.getView();
+        _validateRequiredFields: function () {
+            const oView = this.getView();
             const oModel = oView.getModel();
-            
+
             let isValid = true;
             const validationState = {
                 idSociedad: "None",
@@ -721,29 +736,29 @@ sap.ui.define([
                 idEtiqueta: "None",
                 etiqueta: "None"
             };
-            
+
             // --- MODIFICADO: Eliminadas las validaciones de Sociedad y CEDI ---
             // Ya no son obligatorios
             // -----------------------------------------------------------------
-            
+
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             if (!sIdEtiqueta || sIdEtiqueta.trim() === "") {
                 validationState.idEtiqueta = "Error";
                 isValid = false;
             }
-            
+
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
             if (!sEtiqueta || sEtiqueta.trim() === "") {
                 validationState.etiqueta = "Error";
                 isValid = false;
             }
-            
+
             oModel.setProperty("/validationState", validationState);
-            
+
             return isValid;
         },
 
-        _clearValidationStates: function() {
+        _clearValidationStates: function () {
             const oModel = this.getView().getModel();
             oModel.setProperty("/validationState", {
                 idSociedad: "None",
@@ -761,13 +776,13 @@ sap.ui.define([
                 );
                 return;
             }
-            
+
             const oView = this.getView();
-            
+
             // Obtener valores (pueden ser vacíos ahora)
             const sSociedad = oView.byId("inputIdSociedad").getSelectedKey() || "";
             const sCedi = oView.byId("inputIdCedi").getSelectedKey() || "";
-            
+
             const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
             const sEtiqueta = oView.byId("inputEtiqueta").getValue();
 
@@ -794,7 +809,7 @@ sap.ui.define([
                 ruta: oView.byId("inputRuta").getValue(),
                 descripcion: oView.byId("textAreaDescripcion").getValue(),
                 parent: true,
-                uiState: "Success" 
+                uiState: "Success"
             };
 
             const apiPayload = {
@@ -822,10 +837,10 @@ sap.ui.define([
             const oModel = this.getView().getModel();
             const aLabels = oModel.getProperty("/labels");
 
-            aLabels.unshift(newData); 
+            aLabels.unshift(newData);
 
             oModel.setProperty("/labels", aLabels);
-            
+
             const oViewModel = this.getView().getModel("view");
             oViewModel.setProperty("/totalRows", aLabels.length);
 
@@ -836,17 +851,17 @@ sap.ui.define([
         onCloseNewCatalogo: function () {
             this.byId("inputIdSociedad")?.setSelectedKey("");
             this.byId("inputIdCedi")?.setSelectedKey("");
-            
+
             // Resetear filtro de CEDIs
             const oCatalogsModel = this.getView().getModel("catalogs");
-            if(oCatalogsModel) {
+            if (oCatalogsModel) {
                 oCatalogsModel.setProperty("/cedis", []);
                 oCatalogsModel.setProperty("/cedisEnabled", false);
             }
-            
+
             this.byId("inputIdEtiqueta")?.setValue("");
             this.byId("inputEtiqueta")?.setValue("");
-            this.byId("fragmentInputIndice")?.setTokens([]); 
+            this.byId("fragmentInputIndice")?.setTokens([]);
             this.byId("inputColeccion")?.setValue("");
             this.byId("inputSeccion")?.setValue("");
             this.byId("inputSecuencia")?.setValue("0");
@@ -859,7 +874,7 @@ sap.ui.define([
                 });
             }
         },
-        
+
         onSaveUpdate: function (oEvent) {
             const oDialog = oEvent?.getSource()?.getParent?.() || this._updateDialog;
             if (!oDialog) {
@@ -872,7 +887,7 @@ sap.ui.define([
                 return;
             }
             const updatedData = updateModel.getData();
-        
+
             const tokensToString = function (value) {
                 if (Array.isArray(value)) {
                     return value
@@ -886,18 +901,18 @@ sap.ui.define([
             if (updatedData.parent === true) {
                 if (!updatedData.etiqueta || updatedData.etiqueta.trim() === "") {
                     MessageBox.error("El campo 'Etiqueta' no puede estar vacío.");
-                    return; 
+                    return;
                 }
-            } 
-            else { 
+            }
+            else {
                 if (!updatedData.valor || updatedData.valor.trim() === "") {
                     MessageBox.error("El campo 'Valor' no puede estar vacío.");
                     return;
                 }
             }
-        
+
             updatedData.uiState = "Warning";
-        
+
             let operation;
             if (updatedData.parent) {
                 const updates = {
@@ -912,7 +927,7 @@ sap.ui.define([
                     ROUTE: updatedData.ruta || "",
                     DESCRIPCION: updatedData.descripcion || ""
                 };
-        
+
                 operation = {
                     collection: "labels",
                     action: "UPDATE",
@@ -933,7 +948,7 @@ sap.ui.define([
                     DESCRIPCION: updatedData.descripcion || "",
                     IDVALORPA: updatedData.idvalorpa || undefined
                 };
-        
+
                 operation = {
                     collection: "values",
                     action: "UPDATE",
@@ -943,12 +958,12 @@ sap.ui.define([
                     }
                 };
             }
-        
+
             this._labelService.addOperation(operation);
-        
+
             const dataModel = this.getView().getModel();
             const labels = dataModel.getProperty("/labels");
-        
+
             if (updatedData.parent) {
                 const updatedLabels = labels.map(label =>
                     label.idetiqueta === updatedData.idetiqueta ? updatedData : label
@@ -968,14 +983,14 @@ sap.ui.define([
                 });
                 dataModel.setProperty("/labels", updatedLabels);
             }
-        
+
             oDialog.close();
             MessageToast.show("Cambios guardados localmente. La fila se marcó como Warning.");
             MessageToast.show("Cambios guardados. No olvide confirmar los cambios.");
         },
 
         onSearch: function (oEvent) {
-             const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
+            const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
             const oTable = this.byId("treeTable");
             const oBinding = oTable.getBinding("rows");
 
@@ -992,7 +1007,7 @@ sap.ui.define([
                             new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
                             new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery)
                         ],
-                        and: false 
+                        and: false
                     })
                 );
             }

@@ -120,9 +120,12 @@
                         <!-- IDSOCIEDAD -->
                         <table:Column width="120px" sortProperty="idsociedad"
                             filterProperty="idsociedad">
-                            <Label text="ID Sociedad" />
+                            <Label text="Sociedad" />
                             <table:template>
-                                <Text text="{idsociedad}" wrapping="false" />
+                                <Text text="{
+                                    path: 'idsociedad',
+                                    formatter: '.getSociedadDescription'
+                                }" wrapping="false" />
                             </table:template>
                         </table:Column>
 
@@ -136,10 +139,13 @@
                         </table:Column>
 
                         <!-- IDCEDI -->
-                        <table:Column width="100px" sortProperty="idcedi" filterProperty="idcedi">
-                            <Label text="ID CEDI" />
+                        <table:Column width="150px" sortProperty="idcedi" filterProperty="idcedi">
+                            <Label text="CEDI" />
                             <table:template>
-                                <Text text="{idcedi}" wrapping="false" />
+                                <Text text="{
+                                    path: 'idcedi',
+                                    formatter: '.getCediDescription'
+                                }" wrapping="false" />
                             </table:template>
                         </table:Column>
 
