@@ -105,12 +105,14 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
               resolve(transformedData);
             } catch (error) {
               console.error("Error transforming data:", error);
-              reject(error);
+              // CAMBIO: Resolvemos array vacío para manejo estilo React
+              resolve([]);
             }
           },
           error: (error) => {
             console.error("Error fetching labels:", error);
-            reject(error);
+            // CAMBIO: Resolvemos array vacío en lugar de reject
+            resolve([]);
           },
         });
       });
@@ -150,11 +152,14 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
               data: result,
             });
           },
-          error: (error) => {
+          error: (xhr, status, error) => {
             console.error("Error saving changes:", error);
-            reject({
+            
+            // CAMBIO: Manejo estilo React, devolvemos success: false en lugar de reject
+            const sMsg = xhr.responseJSON?.message || error || "Error desconocido";
+            resolve({
               success: false,
-              message: "Error al guardar los cambios.",
+              message: "Error al guardar los cambios: " + sMsg,
             });
           },
         });

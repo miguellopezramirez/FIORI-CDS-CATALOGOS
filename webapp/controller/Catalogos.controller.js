@@ -45,6 +45,8 @@ sap.ui.define([
                 .then((data) => {
                     const dataModel = this.getView().getModel();
                     dataModel.setProperty("/labels", data);
+                    // CAMBIO: Guardamos copia maestra para el buscador recursivo
+                    dataModel.setProperty("/masterLabels", JSON.parse(JSON.stringify(data)));
 
                     // --- LÓGICA MODIFICADA PARA COMBOS EN CASCADA ---
                     const oSociedadLabel = data.find(d => d.idetiqueta === "SOCIEDAD");
@@ -71,10 +73,13 @@ sap.ui.define([
                     });
                     viewModel.setProperty("/totalRows", totalRows);
 
-                    MessageToast.show("Datos cargados correctamente");
+                    if (data.length > 0) {
+                        MessageToast.show("Datos cargados correctamente");
+                    }
                 })
                 .catch((error) => {
-                    MessageBox.error("Error al cargar los datos: " + error.message);
+                    // CAMBIO: Ahora solo captura errores de sintaxis críticos, no de red (manejados en service)
+                    MessageBox.error("Error crítico al cargar los datos: " + error.message);
                 })
                 .finally(() => {
                     viewModel.setProperty("/busy", false);
@@ -98,8 +103,6 @@ sap.ui.define([
         },
 
         // --- NUEVA FUNCIÓN HELPER: Filtrar CEDIs por VALOR PADRE ---
-// En Catalogos.controller.js
-
         _filterCedis: function(sParentKey) {
             const oCatalogsModel = this.getView().getModel("catalogs");
             const aAllCedis = oCatalogsModel.getProperty("/allCedis");
@@ -122,8 +125,6 @@ sap.ui.define([
             oCatalogsModel.setProperty("/cedis", aFilteredCedis);
             oCatalogsModel.setProperty("/cedisEnabled", true);
         },
-
-        // ... (onRowSelectionChange, onTokenUpdate, onNewCatalogo se mantienen igual) ...
 
         onRowSelectionChange: function (oEvent) {
             const oTable = this.byId("treeTable");
@@ -243,7 +244,6 @@ sap.ui.define([
             });
         },
 
-        // ... (onDelete, _deleteRecord, onValorPadreChange se mantienen igual) ...
          onDelete: function () {
              const oTable = this.byId("treeTable");
             const aSelectedIndices = oTable.getSelectedIndices();
@@ -300,8 +300,6 @@ sap.ui.define([
             const oValorModel = oDialog.getModel("newValor");
             oValorModel.setProperty("/idvalorpa", sValue);
         },
-
-        // ... (_prepareValueHelpData, onNewValor, onValorPadreComboChange etc. igual) ...
 
         _prepareValueHelpData: function(aLabels) {
             const aFlatItems = [];
@@ -635,6 +633,7 @@ sap.ui.define([
 
             this._labelService.saveChanges()
                 .then((result) => {
+                    // CAMBIO: Patrón React - Verificar bandera success
                     if (result.success) {
                         viewModel.setProperty("/saveMessage", result.message);
 
@@ -643,10 +642,14 @@ sap.ui.define([
                         }, 3000);
 
                         this._loadLabels();
+                        MessageBox.success(result.message);
+                    } else {
+                        // ERROR CONTROLADO (Estilo React)
+                        MessageBox.error(result.message);
                     }
                 })
                 .catch((error) => {
-                    MessageBox.error("Error al guardar los cambios: " + error.message);
+                    MessageBox.error("Error crítico inesperado: " + error.message);
                 })
                 .finally(() => {
                     viewModel.setProperty("/busy", false);
@@ -974,30 +977,94 @@ sap.ui.define([
             MessageToast.show("Cambios guardados. No olvide confirmar los cambios.");
         },
 
+        // --- BUSCADOR RECURSIVO (Google Style) y Colapso ---
         onSearch: function (oEvent) {
-             const sQuery = oEvent.getParameter("newValue") || oEvent.getParameter("query") || "";
-            const oTable = this.byId("treeTable");
-            const oBinding = oTable.getBinding("rows");
+            const sQuery = (oEvent.getParameter("newValue") || oEvent.getParameter("query") || "").toLowerCase();
+            const dataModel = this.getView().getModel();
+            
+            // Obtenemos la copia maestra (segura) de los datos
+            const aMasterData = dataModel.getProperty("/masterLabels");
 
-            if (!oBinding) return;
+            // Si no hay búsqueda, restauramos todo tal cual
+            if (!sQuery) {
+                dataModel.setProperty("/labels", JSON.parse(JSON.stringify(aMasterData)));
+                // Actualizamos contador de filas
+                this._updateTotalRows(aMasterData);
+                
+                // Opcional: Colapsar todo al limpiar la búsqueda también
+                const oTable = this.byId("treeTable");
+                if(oTable) oTable.collapseAll();
 
-            const aFilters = [];
-            if (sQuery) {
-                const sLower = sQuery.toLowerCase();
-                aFilters.push(
-                    new sap.ui.model.Filter({
-                        filters: [
-                            new sap.ui.model.Filter("etiqueta", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("descripcion", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("coleccion", sap.ui.model.FilterOperator.Contains, sQuery),
-                            new sap.ui.model.Filter("seccion", sap.ui.model.FilterOperator.Contains, sQuery)
-                        ],
-                        and: false 
-                    })
-                );
+                return;
             }
-            oBinding.filter(aFilters);
+
+            // Función auxiliar para buscar texto en un objeto (fila)
+            const _matches = (obj) => {
+                // Lista de campos donde queremos buscar
+                const fieldsToCheck = [
+                    "idetiqueta", "etiqueta", "descripcion", "idsociedad", 
+                    "idcedi", "coleccion", "seccion", "ruta", "imagen",
+                    "idvalor", "valor", "alias", "idvalorpa" // Campos de hijos
+                ];
+
+                return fieldsToCheck.some(key => {
+                    const val = obj[key];
+                    return val && String(val).toLowerCase().includes(sQuery);
+                });
+            };
+
+            // LÓGICA RECURSIVA:
+            const aFilteredData = [];
+
+            aMasterData.forEach(parent => {
+                const parentMatches = _matches(parent);
+                
+                let childrenMatches = [];
+                if (parent.children && parent.children.length > 0) {
+                    // Filtramos los hijos que coinciden
+                    childrenMatches = parent.children.filter(child => _matches(child));
+                }
+
+                // CASO 1: El Padre coincide. 
+                // Estrategia: Mostramos el padre y TODOS sus hijos (contexto completo)
+                if (parentMatches) {
+                    // Clonamos para no modificar la master
+                    const parentClone = JSON.parse(JSON.stringify(parent));
+                    aFilteredData.push(parentClone);
+                }
+                // CASO 2: El Padre NO coincide, pero tiene HIJOS que sí.
+                // Estrategia: Mostramos el padre (para que se vea el árbol) pero SOLO los hijos filtrados
+                else if (childrenMatches.length > 0) {
+                    const parentClone = JSON.parse(JSON.stringify(parent));
+                    parentClone.children = childrenMatches; // Reemplazamos hijos por solo los que coinciden
+                    aFilteredData.push(parentClone);
+                }
+                // CASO 3: Ni padre ni hijos coinciden -> Se omite.
+            });
+
+            // Actualizamos el modelo directamente
+            dataModel.setProperty("/labels", aFilteredData);
+            
+            // CAMBIO: Forzamos que se cierren todos los nodos (collapseAll) en lugar de expandirlos
+            const oTable = this.byId("treeTable");
+            if(oTable) {
+                oTable.collapseAll(); 
+            }
+            
+            // Actualizar contador
+            this._updateTotalRows(aFilteredData);
         },
+            
+        // Función auxiliar para recalcular el contador de filas (Total Rows)
+        _updateTotalRows: function(data) {
+            let totalRows = data.length;
+            data.forEach(parent => {
+                if (parent.children) {
+                    totalRows += parent.children.length;
+                }
+            });
+            this.getView().getModel("view").setProperty("/totalRows", totalRows);
+        }
 
     });
 });
