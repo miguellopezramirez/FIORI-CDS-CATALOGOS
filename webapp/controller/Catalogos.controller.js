@@ -61,10 +61,8 @@ sap.ui.define(
                 .then((data) => {
                     const dataModel = this.getView().getModel();
                     dataModel.setProperty("/labels", data);
-                    // CAMBIO: Guardamos copia maestra para el buscador recursivo
                     dataModel.setProperty("/masterLabels", JSON.parse(JSON.stringify(data)));
 
-            // --- LÓGICA MODIFICADA PARA COMBOS EN CASCADA ---
             const oSociedadLabel = data.find(
               (d) => d.idetiqueta === "SOCIEDAD"
             );
@@ -73,15 +71,13 @@ sap.ui.define(
             const oCediLabel = data.find((d) => d.idetiqueta === "CEDI");
             const aCedis = oCediLabel ? oCediLabel.children : [];
 
-            // Guardamos 'allCedis' como maestra y 'cedis' como la lista filtrada (inicialmente vacía)
             const oCatalogsModel = new JSONModel({
               sociedades: aSociedades,
-              allCedis: aCedis, // Lista completa para filtrar después
-              cedis: [], // Lista que se mostrará en el combo (filtrada)
-              cedisEnabled: false, // Controla si el combo CEDI está habilitado
+              allCedis: aCedis, 
+              cedis: [], 
+              cedisEnabled: false, 
             });
             this.getView().setModel(oCatalogsModel, "catalogs");
-            // -------------------------------------------------
 
             let totalRows = data.length;
             data.forEach((parent) => {
@@ -101,45 +97,30 @@ sap.ui.define(
           });
       },
 
-      /**
-       * Obtiene la descripción del CEDI basándose en el idcedi
-       */
       getCediDescription: function (idcedi) {
         return formatter.getCediDescription(idcedi, this);
       },
 
-      /**
-       * Obtiene la descripción de la SOCIEDAD basándose en el idsociedad
-       */
       getSociedadDescription: function (idsociedad) {
         return formatter.getSociedadDescription(idsociedad, this);
       },
 
-      /**
-       * Obtiene la descripción del VALOR PADRE basándose en el idvalorpa
-       */
       getValorPadreDescription: function (idvalorpa) {
         return formatter.getValorPadreDescription(idvalorpa, this);
       },
 
-      // --- NUEVA FUNCIÓN: Manejar cambio de sociedad (filtrado en cascada) ---
       onSociedadChange: function (oEvent) {
         const sSelectedSociedadKey = oEvent.getParameter("selectedKey");
         this._filterCedis(sSelectedSociedadKey);
 
-        // Limpiar la selección actual del CEDI al cambiar de sociedad
         const sSourceId = oEvent.getSource().getId();
 
-        // Detectar si es el diálogo de Nuevo o Modificar para limpiar el input correcto
         if (sSourceId.includes("updateInputIdSociedad")) {
           this.byId("updateInputIdCedi").setSelectedKey(null);
         } else {
           this.byId("inputIdCedi").setSelectedKey(null);
         }
       },
-
-      // --- NUEVA FUNCIÓN HELPER: Filtrar CEDIs por VALOR PADRE ---
-      // En Catalogos.controller.js
 
       _filterCedis: function (sParentKey) {
         const oCatalogsModel = this.getView().getModel("catalogs");
@@ -151,20 +132,13 @@ sap.ui.define(
           return;
         }
 
-        // CORRECCIÓN: Convertir ambos lados a String para asegurar que coincidan
-        // independientemente de si son números o textos.
         const aFilteredCedis = aAllCedis.filter(
           (cedi) => String(cedi.idvalorpa) === String(sParentKey)
         );
 
-        console.log("Filtrando CEDIs para Sociedad:", sParentKey); // Para depurar
-        console.log("Encontrados:", aFilteredCedis.length); // Para depurar
-
         oCatalogsModel.setProperty("/cedis", aFilteredCedis);
         oCatalogsModel.setProperty("/cedisEnabled", true);
       },
-
-      // ... (onRowSelectionChange, onTokenUpdate, onNewCatalogo se mantienen igual) ...
 
       onRowSelectionChange: function (oEvent) {
         const oTable = this.byId("treeTable");
@@ -225,7 +199,6 @@ sap.ui.define(
           });
         }
 
-        // Al abrir nuevo, limpiamos filtros
         const oCatalogsModel = this.getView().getModel("catalogs");
         if (oCatalogsModel) {
           oCatalogsModel.setProperty("/cedis", []);
@@ -251,18 +224,15 @@ sap.ui.define(
         const oSelectedData = oContext.getObject();
         const oUpdateData = JSON.parse(JSON.stringify(oSelectedData));
 
-        // --- MODIFICADO: Precargar CEDIs basados en la sociedad actual ---
         if (oUpdateData.idsociedad) {
           this._filterCedis(oUpdateData.idsociedad);
         } else {
-          // Si no tiene sociedad, limpiar lista
           const oCatalogsModel = this.getView().getModel("catalogs");
           if (oCatalogsModel) {
             oCatalogsModel.setProperty("/cedis", []);
             oCatalogsModel.setProperty("/cedisEnabled", false);
           }
         }
-        // ---------------------------------------------------------------
 
         if (!this._pUpdateDialog) {
           this._pUpdateDialog = this.loadFragment({
@@ -284,7 +254,6 @@ sap.ui.define(
           const oValueHelpModel = new JSONModel(oValueHelpData);
           oDialog.setModel(oValueHelpModel, "valueHelp");
 
-          // Inicializar visibilidad del botón de limpiar
           const oClearButton = this.byId("valClearButton_2");
           if (oClearButton) {
             oClearButton.setVisible(!!oUpdateData.idvalorpa);
@@ -358,8 +327,6 @@ sap.ui.define(
         const oValorModel = oDialog.getModel("newValor");
         oValorModel.setProperty("/idvalorpa", sValue);
       },
-
-      // ... (_prepareValueHelpData, onNewValor, onValorPadreComboChange etc. igual) ...
 
       _prepareValueHelpData: function (aLabels) {
         const aFlatItems = [];
@@ -457,7 +424,6 @@ sap.ui.define(
 
           if (!oDialog) return;
 
-          // Determinar modelo basado en el ID del combo o título del diálogo
           let sModelName = "newValor";
           let sClearBtnId = "valClearButton";
 
@@ -493,7 +459,6 @@ sap.ui.define(
 
         const oValueHelpModel = oParentDialog.getModel("valueHelp");
 
-        // Determinar si es New o Update
         let sModelName = "newValor";
         if (oParentDialog.getTitle() === "Modificar Registro") {
           sModelName = "update";
@@ -580,7 +545,6 @@ sap.ui.define(
           let sComboBoxId = "valComboBoxIdValorPa";
           let sClearBtnId = "valClearButton";
 
-          // Buscar dialogo abierto (Nuevo o Modificar)
           for (let i = 0; i < aDialogs.length; i++) {
             const oDlg = aDialogs[i];
             if (
@@ -827,6 +791,7 @@ sap.ui.define(
         this._pValorPadreDialog = null;
       },
 
+      // --- MODIFICADO: Maneja errores del Backend en Diálogo ---
       onSaveChanges: function () {
         const viewModel = this.getView().getModel("view");
         viewModel.setProperty("/busy", true);
@@ -842,6 +807,14 @@ sap.ui.define(
               }, 3000);
 
               this._loadLabels();
+            } else {
+              // AQUÍ VERIFICAMOS SI HAY ERRORES DETALLADOS DEL BACKEND
+              if (result.errorDetails && result.errorDetails.length > 0) {
+                this._showErrorDialog(result.message, result.errorDetails);
+              } else {
+                // Si solo hay mensaje genérico, usamos el MessageBox estándar
+                MessageBox.error(result.message);
+              }
             }
           })
           .catch((error) => {
@@ -850,6 +823,60 @@ sap.ui.define(
           .finally(() => {
             viewModel.setProperty("/busy", false);
           });
+      },
+
+      // --- NUEVA FUNCIÓN: Abre el Diálogo de Errores Estilizado ---
+      _showErrorDialog: function (sMainMsg, aDetails) {
+            // 1. Procesar detalles. 
+            const aProcessedDetails = aDetails.map(err => {
+                // CASO A: Error completo del Backend (con operation, code, etc.)
+                if (err.code && err.operation) {
+                    return {
+                        isBackend: true,
+                        // FORMATO EXACTO DE LA IMAGEN:
+                        title: `Operación: ${err.operation} en ${err.collection}`,
+                        id: err.id,
+                        message: err.message,
+                        code: err.code
+                    };
+                }
+                
+                // CASO B: Error simple de validación Frontend ({ field, msg })
+                return {
+                    isBackend: false, 
+                    title: err.field || "Error de Validación",
+                    message: err.msg || err.message || err,
+                    id: "-", 
+                    code: "VALIDATION"
+                };
+            });
+
+            if (!this._pErrorDialog) {
+                this._pErrorDialog = this.loadFragment({
+                    name: "com.cat.sapfioricatalogs.view.fragments.ErrorDialog"
+                }).then((oDialog) => {
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
+                });
+            }
+
+            this._pErrorDialog.then((oDialog) => {
+                const oErrorModel = new JSONModel({
+                    dialogTitle: "Errores al Guardar Cambios",
+                    count: aProcessedDetails.length,
+                    details: aProcessedDetails
+                });
+                oDialog.setModel(oErrorModel, "errors");
+                oDialog.open();
+            });
+        },
+
+      onCloseErrorDialog: function () {
+        if (this._pErrorDialog) {
+          this._pErrorDialog.then((oDialog) => {
+            oDialog.close();
+          });
+        }
       },
 
       onRefresh: function () {
@@ -921,10 +948,6 @@ sap.ui.define(
           etiqueta: "None",
         };
 
-        // --- MODIFICADO: Eliminadas las validaciones de Sociedad y CEDI ---
-        // Ya no son obligatorios
-        // -----------------------------------------------------------------
-
         const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
         if (!sIdEtiqueta || sIdEtiqueta.trim() === "") {
           validationState.idEtiqueta = "Error";
@@ -963,7 +986,6 @@ sap.ui.define(
 
         const oView = this.getView();
 
-        // Obtener valores (pueden ser vacíos ahora)
         const sSociedad = oView.byId("inputIdSociedad").getSelectedKey() || "";
         const sCedi = oView.byId("inputIdCedi").getSelectedKey() || "";
 
@@ -1043,7 +1065,6 @@ sap.ui.define(
         this.byId("inputIdSociedad")?.setSelectedKey("");
         this.byId("inputIdCedi")?.setSelectedKey("");
 
-        // Resetear filtro de CEDIs
         const oCatalogsModel = this.getView().getModel("catalogs");
         if (oCatalogsModel) {
           oCatalogsModel.setProperty("/cedis", []);

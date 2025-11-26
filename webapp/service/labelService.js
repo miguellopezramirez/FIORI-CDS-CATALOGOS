@@ -155,11 +155,60 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
           error: (xhr, status, error) => {
             console.error("Error saving changes:", error);
             
-            // CAMBIO: Manejo estilo React, devolvemos success: false en lugar de reject
-            const sMsg = xhr.responseJSON?.message || error || "Error desconocido";
+            const response = xhr.responseJSON;
+            let sMsg = "Error desconocido";
+            let aBackendErrors = [];
+            
+            // --- SOLUCIÓN DUPLICADOS: Usamos un Set para rastrear IDs procesados ---
+            const seenErrors = new Set();
+
+            // 1. Intentar obtener mensaje principal
+            if (response && response.error) {
+                sMsg = response.error.message; // "Bad Request"
+                
+                // Si hay mensaje de usuario interno, es mejor:
+                if (response.error.innererror && response.error.innererror.messageUSR) {
+                    sMsg = response.error.innererror.messageUSR; // "Una o más operaciones fallaron..."
+                }
+            }
+
+            // 2. PARSING DETALLADO PARA LA MODAL (Estilo Imagen)
+            // Ruta: error -> innererror -> data[] -> dataRes[] -> status="ERROR"
+            if (response && response.error && response.error.innererror && Array.isArray(response.error.innererror.data)) {
+                
+                response.error.innererror.data.forEach(group => {
+                    if (group.dataRes && Array.isArray(group.dataRes)) {
+                        group.dataRes.forEach(item => {
+                            // Buscamos solo los items que fallaron
+                            if (item.status === "ERROR" && item.error) {
+                                
+                                // Generamos una clave única (ID + Código de error)
+                                const uniqueKey = (item.id || "unknown") + "_" + (item.error.code || "err");
+                                
+                                // Solo agregamos si no lo hemos visto antes
+                                if (!seenErrors.has(uniqueKey)) {
+                                    seenErrors.add(uniqueKey);
+                                    
+                                    // Guardamos TODOS los datos necesarios para la tarjeta rosa
+                                    aBackendErrors.push({
+                                        operation: item.operation,   // "CREATE"
+                                        collection: item.collection, // "labels"
+                                        id: item.id,                 // "22222"
+                                        code: item.error.code,       // "DUPLICATE_KEY"
+                                        message: item.error.message  // "Ya existe un documento..."
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            // CAMBIO: Devolvemos el array detallado en errorDetails
             resolve({
               success: false,
-              message: "Error al guardar los cambios: " + sMsg,
+              message: sMsg,
+              errorDetails: aBackendErrors 
             });
           },
         });

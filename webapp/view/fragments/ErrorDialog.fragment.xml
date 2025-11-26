@@ -1,0 +1,110 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:html="http://www.w3.org/1999/xhtml">
+    
+    <Dialog
+        id="errorDialog"
+        title="{errors>/dialogTitle}"
+        state="None"
+        contentWidth="550px"
+        draggable="true">
+        
+        <html:style>
+            /* Caja Amarilla Superior */
+            .warningBox {
+                background-color: #FFF9C4; /* Amarillo claro */
+                border: 1px solid #FBC02D; /* Borde amarillo oscuro */
+                border-radius: 5px;
+                padding: 0.8rem;
+                margin-bottom: 1rem;
+            }
+            .warningText {
+                color: #000;
+                font-size: 0.9rem;
+            }
+
+            /* Tarjeta Rosa de Error */
+            .errorCard {
+                background-color: #FFEBEE; /* Fondo rosado muy claro */
+                border: 1px solid #FF8A80; /* Borde rosado/rojo */
+                border-radius: 5px;
+                padding: 0.8rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            /* Título de la tarjeta (Operación...) */
+            .cardHeader {
+                font-weight: bold;
+                font-size: 1rem;
+                color: #000;
+                margin-left: 0.5rem;
+            }
+
+            /* Etiquetas (ID, Error) */
+            .labelBold {
+                font-weight: 800; /* Extra bold */
+                color: #000;
+                margin-right: 0.3rem;
+                min-width: 40px;
+            }
+            
+            /* Texto del valor */
+            .valueText {
+                color: #000;
+            }
+
+            /* Código gris abajo */
+            .codeText {
+                color: #666;
+                font-size: 0.85rem;
+                margin-top: 0.2rem;
+            }
+        </html:style>
+
+        <content>
+            <VBox class="sapUiMediumMargin">
+                
+                <HBox class="warningBox" alignItems="Center">
+                    <core:Icon src="sap-icon://alert" color="#F57F17" size="1.2rem" class="sapUiTinyMarginEnd" />
+                    <Text text="Se encontraron {errors>/count} error(es) al procesar la operación. Los cambios no fueron guardados." class="warningText" />
+                </HBox>
+
+                <List items="{errors>/details}" showSeparators="None" backgroundDesign="Transparent">
+                    <CustomListItem>
+                        <VBox class="sapUiTinyMarginBottom">
+                            
+                            <VBox class="errorCard">
+                                
+                                <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                                    <core:Icon src="sap-icon://error" color="#D32F2F" size="1rem" />
+                                    <Text text="{errors>title}" class="cardHeader" />
+                                </HBox>
+
+                                <VBox class="sapUiSmallMarginBegin">
+                                    
+                                    <HBox visible="{= ${errors>id} !== '-' }">
+                                        <Text text="ID:" class="labelBold" />
+                                        <Text text="{errors>id}" class="valueText" />
+                                    </HBox>
+
+                                    <HBox class="sapUiTinyMarginTop">
+                                        <Text text="Error:" class="labelBold" />
+                                        <Text text="{errors>message}" class="valueText" wrapping="true" />
+                                    </HBox>
+
+                                    <Text text="Código: {errors>code}" class="codeText sapUiTinyMarginTop" />
+                                </VBox>
+
+                            </VBox>
+                            </VBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+
+        <buttons>
+            <Button text="Cerrar" press="onCloseErrorDialog" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>
