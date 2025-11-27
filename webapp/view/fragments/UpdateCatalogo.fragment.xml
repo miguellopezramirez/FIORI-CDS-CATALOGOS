@@ -41,7 +41,7 @@
                            visible="{= ${update>/parent} === true }"/>
                     <Input id="updateInputIdEtiqueta" 
                            value= "{update>/idetiqueta}" 
-                           editable="false"
+                           editable="true"
                            visible="{= ${update>/parent} === true }"/>
                     
                     <Label text="Etiqueta" required="true"
@@ -54,7 +54,7 @@
                            visible="{= ${update>/parent} === false }"/>
                     <Input id="updateInputIdValor" 
                            value= "{update>/idvalor}" 
-                           editable="false"
+                           editable="true"
                            visible="{= ${update>/parent} === false }"/>
 
                     <Label text="Valor" required="true"
