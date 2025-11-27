@@ -37,6 +37,14 @@ sap.ui.define(
         });
         this.getView().setModel(dataModel);
 
+        // --- NUEVO: Modelo para controlar el botón de Operaciones Pendientes ---
+        const pendingModel = new JSONModel({
+            operations: [],
+            count: 0
+        });
+        this.getView().setModel(pendingModel, "pending");
+        // -----------------------------------------------------------------------
+
         var oConfigModel = this.getOwnerComponent().getModel("config");
 
         this._labelService = new LabelService();
@@ -61,8 +69,10 @@ sap.ui.define(
                 .then((data) => {
                     const dataModel = this.getView().getModel();
                     dataModel.setProperty("/labels", data);
+                    // Guardamos copia maestra para el buscador recursivo
                     dataModel.setProperty("/masterLabels", JSON.parse(JSON.stringify(data)));
 
+            // --- LÓGICA MODIFICADA PARA COMBOS EN CASCADA ---
             const oSociedadLabel = data.find(
               (d) => d.idetiqueta === "SOCIEDAD"
             );
@@ -71,13 +81,18 @@ sap.ui.define(
             const oCediLabel = data.find((d) => d.idetiqueta === "CEDI");
             const aCedis = oCediLabel ? oCediLabel.children : [];
 
+            // Guardamos 'allCedis' como maestra y 'cedis' como la lista filtrada (inicialmente vacía)
             const oCatalogsModel = new JSONModel({
               sociedades: aSociedades,
-              allCedis: aCedis, 
-              cedis: [], 
-              cedisEnabled: false, 
+              allCedis: aCedis, // Lista completa para filtrar después
+              cedis: [], // Lista que se mostrará en el combo (filtrada)
+              cedisEnabled: false, // Controla si el combo CEDI está habilitado
             });
             this.getView().setModel(oCatalogsModel, "catalogs");
+            // -------------------------------------------------
+
+            // Actualizar estados visuales por si había operaciones pendientes en memoria (caso raro pero posible)
+            this._refreshUiStates();
 
             let totalRows = data.length;
             data.forEach((parent) => {
@@ -90,12 +105,144 @@ sap.ui.define(
             MessageToast.show("Datos cargados correctamente");
           })
           .catch((error) => {
+            // Ahora solo captura errores de sintaxis críticos, no de red (manejados en service)
             MessageBox.error("Error al cargar los datos: " + error.message);
           })
           .finally(() => {
             viewModel.setProperty("/busy", false);
           });
       },
+
+      // --- NUEVA FUNCIÓN CLAVE: Recalcular colores (Status) y Contador ---
+      _refreshUiStates: function() {
+            const oModel = this.getView().getModel();
+            const aLabels = oModel.getProperty("/labels"); // Datos actuales de la tabla
+            const aOps = this._labelService.getOperations(); // Operaciones pendientes del servicio
+            
+            // 1. Crear un mapa rápido para búsquedas:  "ID" -> "ACTION"
+            // Esto evita loops anidados ineficientes
+            const opMap = {};
+            aOps.forEach(op => {
+                const sId = op.id; 
+                opMap[sId] = op.action;
+            });
+
+            // 2. Función recursiva para actualizar la propiedad uiState en cada fila
+            const updateRowState = (row) => {
+                const sId = row.idetiqueta || row.idvalor;
+                
+                // Reseteamos estado por defecto
+                row.uiState = "None"; 
+
+                // Si este ID tiene una operación pendiente, asignamos color
+                if (opMap[sId]) {
+                    const action = opMap[sId];
+                    if (action === 'CREATE') row.uiState = "Success";      // Verde
+                    else if (action === 'UPDATE') row.uiState = "Warning"; // Naranja
+                    else if (action === 'DELETE') row.uiState = "Error";   // Rojo
+                }
+
+                // Recursividad para hijos
+                if (row.children && row.children.length > 0) {
+                    row.children.forEach(updateRowState);
+                }
+            };
+
+            // 3. Ejecutar en toda la data y refrescar modelo
+            // Usamos JSON parse/stringify para asegurar que la tabla detecte el cambio profundo en objetos
+            const aNewLabels = JSON.parse(JSON.stringify(aLabels));
+            aNewLabels.forEach(updateRowState);
+            
+            oModel.setProperty("/labels", aNewLabels);
+            
+            // 4. Actualizar modelo de pendientes (Esto controla si el botón se ve o no)
+            const pendingModel = this.getView().getModel("pending");
+            pendingModel.setProperty("/operations", aOps);
+            pendingModel.setProperty("/count", aOps.length);
+      },
+
+      // --- NUEVAS FUNCIONES PARA LA MODAL DE PENDIENTES (Deshacer) ---
+
+      onOpenPendingOps: function() {
+            if (!this._pPendingDialog) {
+                this._pPendingDialog = this.loadFragment({
+                    name: "com.cat.sapfioricatalogs.view.fragments.PendingOperations"
+                }).then((oDialog) => {
+                    this.getView().addDependent(oDialog);
+                    return oDialog;
+                });
+            }
+            this._pPendingDialog.then((oDialog) => {
+                // Nos aseguramos de tener los datos frescos
+                this._refreshUiStates(); 
+                oDialog.open();
+            });
+      },
+
+      onUndoOperation: function(oEvent) {
+            // Obtener el item que se clickeó en la lista
+            const oItem = oEvent.getSource().getParent().getParent();
+            const sPath = oItem.getBindingContext("pending").getPath();
+            const iIndex = parseInt(sPath.split("/").pop()); // Obtener índice del array
+
+            const aOps = this._labelService.getOperations();
+            const opToRemove = aOps[iIndex];
+
+            // 1. Eliminar del servicio
+            this._labelService.removeOperation(iIndex);
+
+            // 2. Lógica visual de "Revertir":
+            // Si era un CREATE, tenemos que quitar la fila de la tabla visualmente ya que no existe en BD.
+            if (opToRemove.action === 'CREATE') {
+                this._removeRowFromTable(opToRemove.id);
+            }
+
+            // 3. Recalcular estados (quita colores rojos/naranjas) y actualiza el contador
+            this._refreshUiStates();
+            
+            // Si ya no hay operaciones, cerramos la modal automáticamente
+            if (this._labelService.getOperations().length === 0) {
+                this.onClosePendingOps();
+            }
+      },
+
+      _removeRowFromTable: function(sId) {
+            const oModel = this.getView().getModel();
+            let aLabels = oModel.getProperty("/labels");
+            
+            // Filtro recursivo para eliminar el ID de la estructura de árbol
+            const filterOut = (list) => {
+                return list.filter(item => {
+                    const itemId = item.idetiqueta || item.idvalor;
+                    if (itemId === sId) return false; // Lo sacamos
+                    if (item.children) {
+                        item.children = filterOut(item.children); // Filtramos hijos
+                        // Actualizamos subRows para compatibilidad
+                        item.subRows = item.children; 
+                    }
+                    return true;
+                });
+            };
+            
+            const filteredLabels = filterOut(aLabels);
+            oModel.setProperty("/labels", filteredLabels);
+            
+            // Actualizar contador de filas total
+            let iTotalRows = 0;
+            filteredLabels.forEach(parent => {
+                iTotalRows++;
+                if (parent.children) iTotalRows += parent.children.length;
+            });
+            this.getView().getModel("view").setProperty("/totalRows", iTotalRows);
+      },
+
+      onClosePendingOps: function() {
+            if (this._pPendingDialog) {
+                this._pPendingDialog.then((oDialog) => oDialog.close());
+            }
+      },
+
+      // ------------------------------------------------------------------
 
       getCediDescription: function (idcedi) {
         return formatter.getCediDescription(idcedi, this);
@@ -115,6 +262,7 @@ sap.ui.define(
 
         const sSourceId = oEvent.getSource().getId();
 
+        // Detectar si es el diálogo de Nuevo o Modificar para limpiar el input correcto
         if (sSourceId.includes("updateInputIdSociedad")) {
           this.byId("updateInputIdCedi").setSelectedKey(null);
         } else {
@@ -122,6 +270,7 @@ sap.ui.define(
         }
       },
 
+      // Helper para filtrar CEDIs
       _filterCedis: function (sParentKey) {
         const oCatalogsModel = this.getView().getModel("catalogs");
         const aAllCedis = oCatalogsModel.getProperty("/allCedis");
@@ -199,6 +348,7 @@ sap.ui.define(
           });
         }
 
+        // Al abrir nuevo, limpiamos filtros
         const oCatalogsModel = this.getView().getModel("catalogs");
         if (oCatalogsModel) {
           oCatalogsModel.setProperty("/cedis", []);
@@ -223,6 +373,16 @@ sap.ui.define(
         const oContext = oTable.getContextByIndex(aSelectedIndices[0]);
         const oSelectedData = oContext.getObject();
         const oUpdateData = JSON.parse(JSON.stringify(oSelectedData));
+
+        // --- VALIDACIÓN DE CONFLICTO (Borrado vs Edición) ---
+            // Si el estado es "Error" (Rojo), significa que está pendiente de DELETE.
+            if (oSelectedData.uiState === "Error") {
+                MessageBox.warning(
+                    "No puede modificar este registro porque está marcado para eliminarse.\n\n" +
+                    "Si desea conservarlo, vaya a 'Operaciones Pendientes' y deshaga la eliminación primero."
+                );
+                return; // DETENEMOS LA EJECUCIÓN AQUÍ
+            }
 
         if (oUpdateData.idsociedad) {
           this._filterCedis(oUpdateData.idsociedad);
@@ -261,6 +421,7 @@ sap.ui.define(
         });
       },
 
+      // --- MODIFICADO: Usar _refreshUiStates para DELETE ---
       onDelete: function () {
         const oTable = this.byId("treeTable");
         const aSelectedIndices = oTable.getSelectedIndices();
@@ -287,16 +448,20 @@ sap.ui.define(
                   if (!oContext) return;
                   const oRecord = oContext.getObject();
                   const sPath = oContext.getPath();
+                  
+                  // Agregar operación al servicio
                   this._deleteRecord(oRecord);
-                  oModel.setProperty(sPath + "/uiState", "Error");
+                  
+                  // YA NO seteamos manualmente el estado 'Error' aquí
+                  // oModel.setProperty(sPath + "/uiState", "Error"); 
                 });
+                
+                // Refrescamos los estados centralmente (esto pintará de rojo)
+                this._refreshUiStates();
+
                 oTable.clearSelection();
-                this.getView()
-                  .getModel("view")
-                  .setProperty("/selectionCount", 0);
-                this.getView()
-                  .getModel("view")
-                  .setProperty("/selectedLabel", null);
+                this.getView().getModel("view").setProperty("/selectionCount", 0);
+                this.getView().getModel("view").setProperty("/selectedLabel", null);
                 MessageToast.show(
                   "Registros marcados para eliminar. Presione 'Guardar Cambios' para confirmar."
                 );
@@ -669,6 +834,7 @@ sap.ui.define(
         oButton.setVisible(false);
       },
 
+      // --- MODIFICADO: Usar _refreshUiStates para CREATE ---
       onSaveNewValor: function (oEvent) {
         const oDialog = oEvent.getSource().getParent();
         if (!oDialog) {
@@ -686,15 +852,18 @@ sap.ui.define(
         const sIdValor = oView.byId("valInputIdValor").getValue();
         const sValor = oView.byId("valInputValor").getValue();
 
+        // RECOLECTAR ERRORES CON FORMATO { field, msg }
         const aErrors = [];
         if (!sIdValor || sIdValor.trim() === "") {
-          aErrors.push("El campo 'ID Valor' es requerido.");
+          aErrors.push({ field: "ID Valor", msg: "El ID del valor es requerido." });
         }
         if (!sValor || sValor.trim() === "") {
-          aErrors.push("El campo 'Valor' es requerido.");
+          aErrors.push({ field: "Valor", msg: "El texto del valor es requerido." });
         }
+
+        // LLAMADA AL DIALOGO SI HAY ERRORES
         if (aErrors.length > 0) {
-          MessageBox.error(aErrors.join("\n"));
+          this._showErrorDialog("Errores en el formulario de Valor:", aErrors);
           return;
         }
 
@@ -712,7 +881,7 @@ sap.ui.define(
           ruta: oView.byId("valInputRuta").getValue(),
           descripcion: oView.byId("valTextAreaDescripcion").getValue(),
           parent: false,
-          uiState: "Success",
+          // uiState: "Success", // YA NO LO PONEMOS MANUALMENTE
         };
 
         const apiPayload = {
@@ -742,14 +911,21 @@ sap.ui.define(
         const aUpdatedLabels = aLabels.map((label) => {
           if (label.idetiqueta === sParentKey) {
             const aChildren = label.children || [];
-            return {
-              ...label,
-              children: [...aChildren, newLocalData],
-            };
+            // Validamos duplicados visuales (opcional, pero buena práctica)
+            if (!aChildren.find(c => c.idvalor === newLocalData.idvalor)) {
+                return {
+                    ...label,
+                    children: [...aChildren, newLocalData],
+                };
+            }
           }
           return label;
         });
         dataModel.setProperty("/labels", aUpdatedLabels);
+        
+        // Refrescar estados visuales (aquí se pintará de verde)
+        this._refreshUiStates();
+
         const oTable = this.byId("treeTable");
         if (oTable) {
           const iParentIndex = aLabels.findIndex(
@@ -789,9 +965,9 @@ sap.ui.define(
         this._pNewValorDialog = null;
         this._pUpdateDialog = null;
         this._pValorPadreDialog = null;
+        this._pPendingDialog = null;
       },
 
-      // --- MODIFICADO: Maneja errores del Backend en Diálogo ---
       onSaveChanges: function () {
         const viewModel = this.getView().getModel("view");
         viewModel.setProperty("/busy", true);
@@ -807,6 +983,12 @@ sap.ui.define(
               }, 3000);
 
               this._loadLabels();
+              
+              // Limpiamos contador de operaciones en el modelo visual
+              const pendingModel = this.getView().getModel("pending");
+              pendingModel.setProperty("/operations", []);
+              pendingModel.setProperty("/count", 0);
+
             } else {
               // AQUÍ VERIFICAMOS SI HAY ERRORES DETALLADOS DEL BACKEND
               if (result.errorDetails && result.errorDetails.length > 0) {
@@ -825,51 +1007,59 @@ sap.ui.define(
           });
       },
 
-      // --- NUEVA FUNCIÓN: Abre el Diálogo de Errores Estilizado ---
       _showErrorDialog: function (sMainMsg, aDetails) {
-            // 1. Procesar detalles. 
-            const aProcessedDetails = aDetails.map(err => {
-                // CASO A: Error completo del Backend (con operation, code, etc.)
-                if (err.code && err.operation) {
-                    return {
-                        isBackend: true,
-                        // FORMATO EXACTO DE LA IMAGEN:
-                        title: `Operación: ${err.operation} en ${err.collection}`,
-                        id: err.id,
-                        message: err.message,
-                        code: err.code
-                    };
-                }
-                
-                // CASO B: Error simple de validación Frontend ({ field, msg })
-                return {
-                    isBackend: false, 
-                    title: err.field || "Error de Validación",
-                    message: err.msg || err.message || err,
-                    id: "-", 
-                    code: "VALIDATION"
-                };
-            });
+        // Procesar detalles para el modelo de la vista
+        const aProcessedDetails = aDetails.map((err) => {
+          
+          // CASO A: Error completo del Backend (con operation, code, etc.)
+          if (err.code && err.operation) {
+              return {
+                  isBackend: true,
+                  title: `Operación: ${err.operation} en ${err.collection}`,
+                  id: err.id,
+                  message: err.message,
+                  code: err.code
+              };
+          }
+          
+          // CASO B: Error simple de validación Frontend ({ field, msg })
+          // O fallback si el backend manda texto plano
+          let sTitle = err.field || "Error";
+          let sMsg = err.msg || err.message || err;
 
-            if (!this._pErrorDialog) {
-                this._pErrorDialog = this.loadFragment({
-                    name: "com.cat.sapfioricatalogs.view.fragments.ErrorDialog"
-                }).then((oDialog) => {
-                    this.getView().addDependent(oDialog);
-                    return oDialog;
-                });
-            }
+          if (typeof err === 'string') {
+             if (err.includes("ID")) sTitle = "ID";
+             else if (err.includes("requerido")) sTitle = "Campo Requerido";
+          }
 
-            this._pErrorDialog.then((oDialog) => {
-                const oErrorModel = new JSONModel({
-                    dialogTitle: "Errores al Guardar Cambios",
-                    count: aProcessedDetails.length,
-                    details: aProcessedDetails
-                });
-                oDialog.setModel(oErrorModel, "errors");
-                oDialog.open();
-            });
-        },
+          return {
+              isBackend: false, 
+              title: sTitle,
+              message: sMsg,
+              id: "-", 
+              code: "VALIDATION"
+          };
+        });
+
+        if (!this._pErrorDialog) {
+          this._pErrorDialog = this.loadFragment({
+            name: "com.cat.sapfioricatalogs.view.fragments.ErrorDialog",
+          }).then((oDialog) => {
+            this.getView().addDependent(oDialog);
+            return oDialog;
+          });
+        }
+
+        this._pErrorDialog.then((oDialog) => {
+          const oErrorModel = new JSONModel({
+            dialogTitle: "Errores al Guardar Cambios",
+            count: aProcessedDetails.length,
+            details: aProcessedDetails,
+          });
+          oDialog.setModel(oErrorModel, "errors");
+          oDialog.open();
+        });
+      },
 
       onCloseErrorDialog: function () {
         if (this._pErrorDialog) {
@@ -975,25 +1165,70 @@ sap.ui.define(
         });
       },
 
+      // --- MODIFICADO: Usar _refreshUiStates para CREATE ---
       onSaveNewCatalogo: function () {
-        if (!this._validateRequiredFields()) {
-          MessageBox.error(
-            "Por favor, complete todos los campos marcados como obligatorios.",
-            { title: "Campos Incompletos" }
-          );
-          return;
+        const oView = this.getView();
+        const oModel = oView.getModel();
+        // Obtenemos la lista actual de etiquetas para verificar duplicados
+        const aCurrentLabels = oModel.getProperty("/labels") || [];
+        
+        const aValidationErrors = [];
+        const validationState = {
+            idSociedad: "None", idCedi: "None", idEtiqueta: "None", etiqueta: "None"
+        };
+
+        // Validar ID Etiqueta (Requerido + Duplicado Local)
+        const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
+        if (!sIdEtiqueta || sIdEtiqueta.trim() === "") {
+            validationState.idEtiqueta = "Error";
+            aValidationErrors.push({ field: "ID Etiqueta", msg: "IDETIQUETA es requerido." });
+        } else {
+            // BLINDAJE LOCAL CONTRA DUPLICADOS
+            const bDuplicate = aCurrentLabels.some(label => 
+                label.idetiqueta.toUpperCase() === sIdEtiqueta.toUpperCase()
+            );
+            if (bDuplicate) {
+                validationState.idEtiqueta = "Error";
+                aValidationErrors.push({ 
+                    field: "ID Etiqueta", 
+                    msg: `El ID '${sIdEtiqueta}' ya existe en el catálogo.` 
+                });
+            }
         }
 
-        const oView = this.getView();
+        // Validar Etiqueta
+        const sEtiqueta = oView.byId("inputEtiqueta").getValue();
+        if (!sEtiqueta || sEtiqueta.trim() === "") {
+            validationState.etiqueta = "Error";
+            aValidationErrors.push({ field: "Etiqueta", msg: "ETIQUETA es requerido." });
+        }
+
+        // Validar Indice
+        const oMultiInput = oView.byId("fragmentInputIndice");
+        const aTokens = oMultiInput.getTokens();
+
+        // Validar Colección
+        const sColeccion = oView.byId("inputColeccion").getValue();
+        if (!sColeccion || sColeccion.trim() === "") {
+             aValidationErrors.push({ field: "Colección", msg: "COLECCION es requerido." });
+        }
+        
+        // Validar Sección
+        const sSeccion = oView.byId("inputSeccion").getValue();
+        if (!sSeccion || sSeccion.trim() === "") {
+             aValidationErrors.push({ field: "Sección", msg: "SECCION es requerido." });
+        }
+
+        oView.getModel().setProperty("/validationState", validationState);
+
+        // SI HAY ERRORES, LLAMAMOS AL NUEVO DIALOGO
+        if (aValidationErrors.length > 0) {
+            this._showErrorDialog("Se encontraron errores en el formulario:", aValidationErrors);
+            return; 
+        }
 
         const sSociedad = oView.byId("inputIdSociedad").getSelectedKey() || "";
         const sCedi = oView.byId("inputIdCedi").getSelectedKey() || "";
-
-        const sIdEtiqueta = oView.byId("inputIdEtiqueta").getValue();
-        const sEtiqueta = oView.byId("inputEtiqueta").getValue();
-
-        const oMultiInput = oView.byId("fragmentInputIndice");
-        const aTokens = oMultiInput.getTokens();
 
         const aIndiceAsObjects = aTokens.map((oToken) => ({
           key: oToken.getKey(),
@@ -1010,8 +1245,8 @@ sap.ui.define(
           idetiqueta: sIdEtiqueta,
           etiqueta: sEtiqueta,
           indice: aIndiceAsObjects,
-          coleccion: oView.byId("inputColeccion").getValue(),
-          seccion: oView.byId("inputSeccion").getValue(),
+          coleccion: sColeccion,
+          seccion: sSeccion,
           secuencia: parseInt(
             oView.byId("inputSecuencia").getValue() || "0",
             10
@@ -1020,7 +1255,7 @@ sap.ui.define(
           ruta: oView.byId("inputRuta").getValue(),
           descripcion: oView.byId("textAreaDescripcion").getValue(),
           parent: true,
-          uiState: "Success",
+          // uiState: "Success", // YA NO
         };
 
         const apiPayload = {
@@ -1045,12 +1280,12 @@ sap.ui.define(
 
         this._labelService.addOperation(operation);
 
-        const oModel = this.getView().getModel();
         const aLabels = oModel.getProperty("/labels");
-
         aLabels.unshift(newData);
-
         oModel.setProperty("/labels", aLabels);
+
+        // Refrescamos estados (pintar de verde)
+        this._refreshUiStates();
 
         const oViewModel = this.getView().getModel("view");
         oViewModel.setProperty("/totalRows", aLabels.length);
@@ -1087,6 +1322,7 @@ sap.ui.define(
         }
       },
 
+      // --- MODIFICADO: Usar _refreshUiStates para UPDATE ---
       onSaveUpdate: function (oEvent) {
         const oDialog =
           oEvent?.getSource()?.getParent?.() || this._updateDialog;
@@ -1123,7 +1359,7 @@ sap.ui.define(
           }
         }
 
-        updatedData.uiState = "Warning";
+        // updatedData.uiState = "Warning"; // YA NO
 
         let operation;
         if (updatedData.parent) {
@@ -1199,6 +1435,9 @@ sap.ui.define(
           });
           dataModel.setProperty("/labels", updatedLabels);
         }
+        
+        // Refrescar estados visuales (pintar de naranja)
+        this._refreshUiStates();
 
         oDialog.close();
         MessageToast.show(
@@ -1220,6 +1459,9 @@ sap.ui.define(
             // Si no hay búsqueda, restauramos todo tal cual
             if (!sQuery) {
                 dataModel.setProperty("/labels", JSON.parse(JSON.stringify(aMasterData)));
+                // IMPORTANTE: Re-aplicar colores de estado si había operaciones pendientes
+                this._refreshUiStates();
+                
                 // Actualizamos contador de filas
                 this._updateTotalRows(aMasterData);
                 
@@ -1276,6 +1518,9 @@ sap.ui.define(
 
             // Actualizamos el modelo directamente
             dataModel.setProperty("/labels", aFilteredData);
+            
+            // Aseguramos que los resultados filtrados también tengan sus colores correctos
+            this._refreshUiStates();
             
             // CAMBIO: Forzamos que se cierren todos los nodos (collapseAll) en lugar de expandirlos
             const oTable = this.byId("treeTable");

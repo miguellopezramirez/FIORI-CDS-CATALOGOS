@@ -1,1 +1,24 @@
-/* Enter your custom styles here */
+/* Estilos para la tarjeta de operación */
+.operationCard {
+    border: 2px solid #0064d9;
+    padding: 0.5rem;
+    background-color: #fff;
+    border-radius: 4px;
+}
+.opTitle {
+    font-weight: bold;
+    font-size: 1rem;
+}
+.opId {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+/* Lista de operaciones pendientes:
+   - Se adapta entre 1 y 2 elementos
+   - Si hay más de 2, mantiene altura y muestra scroll vertical */
+.pendingList {
+  max-height: 20rem; /* Aproximadamente el alto de 4 items */
+  overflow-y: auto;
+}
+

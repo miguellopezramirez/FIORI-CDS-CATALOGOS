@@ -1,0 +1,46 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:html="http://www.w3.org/1999/xhtml">
+    
+    <Dialog
+        title="Operaciones Pendientes"
+        contentWidth="400px">
+        
+        <content>
+            <List
+                id="pendingOpsList"
+                items="{pending>/operations}"
+                noDataText="No hay cambios pendientes."
+                backgroundDesign="Transparent"
+                class="pendingList">
+                <CustomListItem>
+                    <HBox
+                        alignItems="Center"
+                        justifyContent="SpaceBetween"
+                        class="sapUiSmallMargin">
+                        <VBox width="100%" class="operationCard">
+                            <!-- Título sin binding de clase dinámico -->
+                            <Title text="{pending>type}" class="opTitle" />
+                            <!-- Estado coloreado según acción -->
+                            <ObjectStatus
+                                text="{pending>action}"
+                                state="{= ${pending>action} === 'CREATE' ? 'Success' : ${pending>action} === 'UPDATE' ? 'Warning' : 'Error' }" />
+                            <Text text="ID: {pending>id}" class="opId sapUiTinyMarginTop" />
+                        </VBox>
+                        <Button
+                            icon="sap-icon://delete"
+                            type="Transparent"
+                            press=".onUndoOperation"
+                            tooltip="Deshacer cambio"
+                            class="sapUiSmallMarginBegin" />
+                    </HBox>
+                </CustomListItem>
+            </List>
+        </content>
+
+        <buttons>
+            <Button text="Cerrar" press=".onClosePendingOps" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

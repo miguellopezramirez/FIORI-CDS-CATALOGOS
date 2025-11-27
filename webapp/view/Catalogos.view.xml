@@ -18,6 +18,13 @@
                 <Title text="Catálogos y Valores" level="H2" />
                 <ToolbarSpacer />
                 <Button
+                    icon="sap-icon://pending"
+                    text="Operaciones Pendientes ({pending>/count})"
+                    type="{= ${pending>/count} > 0 ? 'Emphasized' : 'Transparent' }"
+                    press=".onOpenPendingOps"
+                    visible="{= ${pending>/count} > 0}" 
+                    class="sapUiSmallMarginEnd"/>
+                <Button
                     id="btnNewCatalog"
                     text="Nuevo Catálogo"
                     icon="sap-icon://add"
