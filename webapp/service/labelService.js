@@ -2,10 +2,10 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
   "use strict";
 
   /**
- * Convierte un string de índices (separados por comas) en un array de Tokens.
- * @param {string} sIndice El string de índices, ej: "Marca,Vehiculo"
- * @returns {Array<object>} Un array de objetos para el MultiInput, ej: [{key: "Marca", text: "Marca"}, ...]
- */
+   * Convierte un string de índices (separados por comas) en un array de Tokens.
+   * @param {string} sIndice El string de índices, ej: "Marca,Vehiculo"
+   * @returns {Array<object>} Un array de objetos para el MultiInput, ej: [{key: "Marca", text: "Marca"}, ...]
+   */
   function _transformIndiceToArray(sIndice) {
     if (!sIndice || sIndice.trim() === "") {
       return []; // Devuelve array vacío si no hay índice
@@ -38,7 +38,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
         return this._oConfigModel.getProperty("/selectedDB");
       }
       // Valor por defecto si algo falla
-      return "MongoDB"; 
+      return "MongoDB";
     },
 
     transformData: function (labels) {
@@ -83,7 +83,6 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       });
     },
 
-
     //Obtiene todas las etiquetas y valores desde el backend.
     fetchLabels: function () {
       // Obtenemos el valor de la DB dinámicamente
@@ -105,89 +104,120 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
               resolve(transformedData);
             } catch (error) {
               console.error("Error transforming data:", error);
-              // CAMBIO: Resolvemos array vacío para manejo estilo React
+              // Resolvemos array vacío para no romper flujo
               resolve([]);
             }
           },
           error: (error) => {
             console.error("Error fetching labels:", error);
-            // CAMBIO: Resolvemos array vacío en lugar de reject
+            // Resolvemos array vacío
             resolve([]);
           },
         });
       });
     },
 
-    // --- OBTENER OPERACIONES (Para la vista) ---
-    getOperations: function() {
-        return this._operations;
+    // --- NUEVO: Obtener operaciones para la vista ---
+    getOperations: function () {
+      return this._operations;
     },
 
-    // --- AGREGAR OPERACIÓN INTELIGENTE (Lógica React) ---
+    // --- MODIFICADO: addOperation (Smart Merge + Tracking ID) ---
     addOperation: function (newOp) {
-        const sId = newOp.payload.ID || newOp.payload.id || newOp.payload.IDETIQUETA || newOp.payload.IDVALOR;
-        const sCollection = newOp.collection;
-        
-        // Buscamos si ya existe una operación pendiente para este ID
-        const existingOpIndex = this._operations.findIndex(op => {
-            const opId = op.payload.ID || op.payload.id || op.payload.IDETIQUETA || op.payload.IDVALOR;
-            return opId === sId && op.collection === sCollection;
-        });
+      // 1. Determinar la clave de rastreo (Tracking ID)
+      // Si es CREATE, el ID viene en el payload directo (ej: IDETIQUETA)
+      // Si es UPDATE/DELETE, el ID viene en payload.id (que es el ID ORIGINAL antes de editar)
+      
+      let sTrackingId = newOp.payload.id; 
+      
+      if (!sTrackingId && newOp.action === 'CREATE') {
+          // Para CREATE, usamos el ID nuevo como rastreo inicial
+          sTrackingId = newOp.payload.IDETIQUETA || newOp.payload.IDVALOR;
+      }
 
-        // CASO 1: No existe operación previa -> Agregamos la nueva
-        if (existingOpIndex === -1) {
-            this._operations.push(this._enrichOpForDisplay(newOp, sId));
-            return;
-        }
+      const sCollection = newOp.collection;
 
-        const existingOp = this._operations[existingOpIndex];
+      // Buscamos si ya existe una operación pendiente para este ID ORIGINAL
+      const existingOpIndex = this._operations.findIndex(op => {
+          // Extraemos el ID de rastreo de la operación guardada
+          let storedId = op.payload.id;
+          if (!storedId && op.action === 'CREATE') {
+             storedId = op.payload.IDETIQUETA || op.payload.IDVALOR;
+          }
+          return storedId === sTrackingId && op.collection === sCollection;
+      });
 
-        // CASO 2: Ya existía. Analizamos la combinación:
+      // CASO 1: No existe operación previa -> Agregamos la nueva
+      if (existingOpIndex === -1) {
+          // Guardamos el ID visualmente para la lista (puede ser el nuevo si se editó)
+          // Pero mantenemos el payload intacto para el rastreo lógico
+          let displayId = sTrackingId;
+          
+          // Si es un UPDATE que cambia el ID, el ID nuevo está dentro de 'updates'
+          if(newOp.action === 'UPDATE' && newOp.payload.updates) {
+              if(newOp.payload.updates.IDETIQUETA) displayId = newOp.payload.updates.IDETIQUETA;
+              if(newOp.payload.updates.IDVALOR) displayId = newOp.payload.updates.IDVALOR;
+          }
 
-        // A) Si la nueva es DELETE...
-        if (newOp.action === 'DELETE') {
-            if (existingOp.action === 'CREATE') {
-                // Si estaba pendiente de CREAR y lo borramos -> Se cancelan mutuamente.
-                // Lo quitamos de la lista como si nunca hubiera existido.
-                this._operations.splice(existingOpIndex, 1);
-            } else {
-                // Si era UPDATE, lo sobrescribimos con DELETE (la eliminación gana)
-                this._operations[existingOpIndex] = this._enrichOpForDisplay(newOp, sId);
-            }
-        }
-        // B) Si la nueva es UPDATE...
-        else if (newOp.action === 'UPDATE') {
-            if (existingOp.action === 'CREATE') {
-                // REGLA DE ORO: Crear + Modificar = Crear (con datos nuevos)
-                // Fusionamos los cambios del update en el payload del create
-                const mergedPayload = { ...existingOp.payload, ...newOp.payload.updates };
-                existingOp.payload = mergedPayload;
-                // El status sigue siendo CREATE
-            } else if (existingOp.action === 'UPDATE') {
-                // Modificar + Modificar = Modificar (últimos datos ganan)
-                const mergedUpdates = { ...existingOp.payload.updates, ...newOp.payload.updates };
-                existingOp.payload.updates = mergedUpdates;
-            }
-        }
+          this._operations.push(this._enrichOpForDisplay(newOp, displayId));
+          return;
+      }
+
+      const existingOp = this._operations[existingOpIndex];
+
+      // CASO 2: Ya existía. Analizamos la combinación:
+
+      // A) Si la nueva es DELETE...
+      if (newOp.action === 'DELETE') {
+          if (existingOp.action === 'CREATE') {
+              // Si estaba pendiente de CREAR y lo borramos -> Se cancelan mutuamente.
+              // Lo quitamos de la lista como si nunca hubiera existido.
+              this._operations.splice(existingOpIndex, 1);
+          } else {
+              // Si era UPDATE, lo sobrescribimos con DELETE (el borrado gana)
+              // Usamos el ID original para asegurar que el backend sepa cuál borrar
+              this._operations[existingOpIndex] = this._enrichOpForDisplay(newOp, sTrackingId);
+          }
+      }
+      // B) Si la nueva es UPDATE...
+      else if (newOp.action === 'UPDATE') {
+          if (existingOp.action === 'CREATE') {
+              // REGLA: Crear + Modificar = Crear (con datos nuevos)
+              // Fusionamos los cambios del update en el payload del create
+              const mergedPayload = { ...existingOp.payload, ...newOp.payload.updates };
+              existingOp.payload = mergedPayload;
+              
+              // Actualizamos el ID visual en la lista por si cambió
+              const newId = mergedPayload.IDETIQUETA || mergedPayload.IDVALOR;
+              existingOp.id = newId; 
+              
+              // La acción se mantiene como CREATE (Sigue verde en la tabla)
+          } else if (existingOp.action === 'UPDATE') {
+              // Modificar + Modificar = Modificar (últimos datos ganan)
+              const mergedUpdates = { ...existingOp.payload.updates, ...newOp.payload.updates };
+              existingOp.payload.updates = mergedUpdates;
+              
+              // Actualizamos el ID visual
+              if(mergedUpdates.IDETIQUETA) existingOp.id = mergedUpdates.IDETIQUETA;
+              if(mergedUpdates.IDVALOR) existingOp.id = mergedUpdates.IDVALOR;
+          }
+      }
     },
 
     // Helper visual para la modal
-    _enrichOpForDisplay: function(op, id) {
-        // Agregamos campos extra solo para que se vean bonitos en la lista
-        op.id = id; 
-        op.type = op.collection === 'labels' ? 'Catálogo' : 'Valor';
-        return op;
+    _enrichOpForDisplay: function (op, id) {
+      op.id = id; // Este es solo para mostrar en la modal (puede ser el ID nuevo)
+      op.type = op.collection === 'labels' ? 'Catálogo' : 'Valor';
+      return op;
     },
 
-    // --- DESHACER OPERACIÓN (Eliminar de la lista) ---
-    removeOperation: function(iIndex) {
-        if (iIndex > -1 && iIndex < this._operations.length) {
-            this._operations.splice(iIndex, 1);
-        }
+    // --- NUEVO: DESHACER OPERACIÓN ---
+    removeOperation: function (iIndex) {
+      if (iIndex > -1 && iIndex < this._operations.length) {
+        this._operations.splice(iIndex, 1);
+      }
     },
 
-
-    
     // Guarda las operaciones pendientes.
     saveChanges: function () {
       if (this._operations.length === 0) {
@@ -201,14 +231,15 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
       // Quitamos las propiedades 'id' y 'type' que agregamos solo para la interfaz visual (la modal).
       // El backend no espera recibir estos campos y pueden causar error 400.
       const sanitizedOperations = this._operations.map(op => {
-          // Creamos una copia del objeto para no modificar la lista visual actual
-          const cleanOp = Object.assign({}, op); 
-          delete cleanOp.id;   // Borramos el ID visual
-          delete cleanOp.type; // Borramos el Tipo visual
-          return cleanOp;
+        const cleanOp = Object.assign({}, op);
+        delete cleanOp.id;   // Borramos campos visuales
+        delete cleanOp.type; 
+        return cleanOp;
       });
 
-        console.log("🚀 [PAYLOAD A ENVIAR AL BACKEND]:", JSON.stringify({ operations: sanitizedOperations }, null, 2));
+      // CONSOLE LOG SOLICITADO: Ver qué se manda al backend
+      console.log("🚀 [PAYLOAD A ENVIAR AL BACKEND]:", JSON.stringify({ operations: sanitizedOperations }, null, 2));
+
       // Obtenemos el valor de la DB dinámicamente
       const sDBServer = this._getDBServer();
       const url =
@@ -220,8 +251,7 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
           url: url,
           type: "POST",
           contentType: "application/json",
-          // CAMBIO: Enviamos sanitizedOperations en lugar de this._operations
-          data: JSON.stringify({ operations: sanitizedOperations }), 
+          data: JSON.stringify({ operations: sanitizedOperations }),
           success: (result) => {
             this._operations = [];
             resolve({
@@ -232,53 +262,56 @@ sap.ui.define(["sap/ui/base/Object"], function (BaseObject) {
           },
           error: (xhr, status, error) => {
             console.error("Error saving changes:", error);
-            
+
             const response = xhr.responseJSON;
             let sMsg = "Error desconocido";
             let aBackendErrors = [];
             
+            // Set para evitar duplicados en la modal rosa
             const seenErrors = new Set();
 
             // 1. Intentar obtener mensaje principal
             if (response && response.error) {
-                sMsg = response.error.message; 
-                
-                if (response.error.innererror && response.error.innererror.messageUSR) {
-                    sMsg = response.error.innererror.messageUSR; 
-                }
+              sMsg = response.error.message;
+              
+              if (response.error.innererror && response.error.innererror.messageUSR) {
+                sMsg = response.error.innererror.messageUSR;
+              }
             }
 
-            // 2. PARSING DETALLADO PARA LA MODAL
+            // 2. PARSING DETALLADO PARA LA MODAL (Estructura innererror)
             if (response && response.error && response.error.innererror && Array.isArray(response.error.innererror.data)) {
-                
-                response.error.innererror.data.forEach(group => {
-                    if (group.dataRes && Array.isArray(group.dataRes)) {
-                        group.dataRes.forEach(item => {
-                            if (item.status === "ERROR" && item.error) {
-                                
-                                const uniqueKey = (item.id || "unknown") + "_" + (item.error.code || "err");
-                                
-                                if (!seenErrors.has(uniqueKey)) {
-                                    seenErrors.add(uniqueKey);
-                                    
-                                    aBackendErrors.push({
-                                        operation: item.operation,
-                                        collection: item.collection,
-                                        id: item.id,
-                                        code: item.error.code,
-                                        message: item.error.message
-                                    });
-                                }
-                            }
+              
+              response.error.innererror.data.forEach(group => {
+                if (group.dataRes && Array.isArray(group.dataRes)) {
+                  group.dataRes.forEach(item => {
+                    // Buscamos solo los items que fallaron
+                    if (item.status === "ERROR" && item.error) {
+                      
+                      const uniqueKey = (item.id || "unknown") + "_" + (item.error.code || "err");
+                      
+                      if (!seenErrors.has(uniqueKey)) {
+                        seenErrors.add(uniqueKey);
+                        
+                        aBackendErrors.push({
+                          operation: item.operation,
+                          collection: item.collection,
+                          id: item.id,
+                          code: item.error.code,
+                          message: item.error.message
                         });
+                      }
                     }
-                });
+                  });
+                }
+              });
             }
 
+            // CAMBIO: Resolvemos success: false con los detalles
             resolve({
               success: false,
               message: sMsg,
-              errorDetails: aBackendErrors 
+              errorDetails: aBackendErrors
             });
           },
         });
